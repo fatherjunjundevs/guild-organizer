@@ -87,7 +87,17 @@ values
   ('00000000-0000-0000-0000-000000000005', 'officer-b@test.local');
 
 select is(
-  (select count(*) from public.profiles),
+  (
+    select count(*)
+    from public.profiles
+    where id in (
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002',
+      '00000000-0000-0000-0000-000000000003',
+      '00000000-0000-0000-0000-000000000004',
+      '00000000-0000-0000-0000-000000000005'
+    )
+  ),
   5::bigint,
   'auth user inserts automatically create application profiles'
 );

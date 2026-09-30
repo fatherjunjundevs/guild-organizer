@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { signInWithDiscord, signOut } from "@/features/auth/actions";
 import { getAuthViewer } from "@/features/auth/viewer";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,13 @@ export default async function HomePage() {
                     {viewer.displayName}
                   </span>
 
+                  <Link
+                    href="/app"
+                    className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-[15px] font-semibold text-[#07101f] transition-colors hover:bg-[var(--accent-hover)]"
+                  >
+                    Open Guild Organizer
+                  </Link>
+
                   <form action={signOut}>
                     <Button type="submit" variant="secondary" size="lg">
                       Sign out
@@ -45,16 +53,12 @@ export default async function HomePage() {
                 </>
               ) : (
                 <form action={signInWithDiscord}>
-                  <input type="hidden" name="next" value="/" />
+                  <input type="hidden" name="next" value="/app" />
                   <Button type="submit" size="lg">
                     Sign in with Discord
                   </Button>
                 </form>
               )}
-
-              <Button variant="secondary" size="lg">
-                Design Foundation
-              </Button>
             </div>
 
             <p className="mt-8 text-sm text-[var(--text-tertiary)]">
