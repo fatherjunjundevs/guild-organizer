@@ -192,11 +192,28 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "create_guild":
+            "accept_guild_invite":
+{ Args: { "p_generation": number,"p_token_digest": string }; Returns: string
+                           },
+"create_guild":
 { Args: { "p_name": string }; Returns: string
+                           },
+"create_guild_invite":
+{ Args: { "p_expires_at": string,"p_guild_id": string,"p_invite_kind": string,"p_role": string,"p_token_digest": string }; Returns: string
                            },
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
+                           },
+"regenerate_guild_invite":
+{ Args: { "p_expires_at": string,"p_invite_id": string,"p_token_digest": string }; Returns: number
+                           },
+"resolve_guild_invite":
+{ Args: { "p_generation": number,"p_token_digest": string }; Returns: {
+              "expires_at": string,"generation": number,"guild_id": string,"guild_name": string,"invite_id": string,"invite_kind": string,"invite_role": string
+            }[]
+                           },
+"revoke_guild_invite":
+{ Args: { "p_invite_id": string }; Returns: undefined
                            },
 "revoke_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
