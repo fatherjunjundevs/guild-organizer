@@ -1,0 +1,90 @@
+:root {
+    /* Core surfaces */
+    --bg-base: #090e17;
+    --bg-canvas: #0d1420;
+  
+    --surface-1: #121b29;
+    --surface-2: #172232;
+    --surface-3: #1d2a3c;
+    --surface-4: #243247;
+  
+    /* Text */
+    --text-primary: #f4f7fb;
+    --text-secondary: #b8c3d1;
+    --text-tertiary: #8795a8;
+    --text-disabled: #657287;
+  
+    /* Borders */
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-default: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.18);
+  
+    /* Product accent */
+    --accent: #7297f7;
+    --accent-hover: #87a7fa;
+    --accent-pressed: #5e82e4;
+    --accent-soft: rgba(114, 151, 247, 0.14);
+    --accent-border: rgba(114, 151, 247, 0.38);
+  
+    /* Guild accent */
+    --guild-accent: #e6ac45;
+    --guild-accent-hover: #efbc5c;
+    --guild-accent-pressed: #cc9438;
+    --guild-accent-soft: rgba(230, 172, 69, 0.14);
+    --guild-accent-border: rgba(230, 172, 69, 0.4);
+  
+    /* Semantic */
+    --success: #4ecb8d;
+    --warning: #f2bb55;
+    --danger: #ef6a6a;
+    --info: #6faaf7;
+  
+    /* Glass */
+    --glass-bg: rgba(18, 27, 41, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-blur: 18px;
+  
+    /* Spacing */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-10: 40px;
+    --space-12: 48px;
+    --space-16: 64px;
+  
+    /* Radius */
+    --radius-xs: 4px;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-2xl: 24px;
+    --radius-full: 999px;
+  
+    /* Motion */
+    --duration-instant: 90ms;
+    --duration-fast: 140ms;
+    --duration-standard: 200ms;
+    --duration-spatial: 260ms;
+    --duration-emphasis: 320ms;
+  
+    --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  
+    /* Focus */
+    --focus-ring: #8cafff;
+    --focus-ring-width: 2px;
+    --focus-ring-offset: 2px;
+  
+    /* Layout */
+    --management-sidebar-expanded: 248px;
+    --management-sidebar-collapsed: 72px;
+    --event-roster-pane: 320px;
+    --event-inspector: 400px;
+    --event-command-bar: 64px;
+    --event-status-bar: 50px;
+  }
