@@ -44,3 +44,42 @@ jobs:
 
       - name: End-to-end tests
         run: pnpm test:e2e
+
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Start local Supabase
+        run: pnpm db:start
+
+      - name: Reset database from migrations
+        run: pnpm db:reset
+
+      - name: Lint database schema
+        run: pnpm db:lint
+
+      - name: Database tests
+        run: pnpm db:test
+
+      - name: Verify generated database types
+        run: pnpm db:types:check
+
+      - name: Stop local Supabase
+        if: always()
+        run: pnpm db:stop
