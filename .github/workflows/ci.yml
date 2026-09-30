@@ -13,6 +13,7 @@ jobs:
       APP_ORIGIN: http://127.0.0.1:3000
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:55421
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: sb_publishable_ci_placeholder
+      INVITE_SIGNING_SECRET: ci-invite-signing-secret-at-least-32-characters
 
     steps:
       - name: Checkout

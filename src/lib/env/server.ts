@@ -1,4 +1,4 @@
-﻿import "server-only";
+import "server-only";
 
 import { z } from "zod";
 
@@ -7,6 +7,7 @@ const serverEnvSchema = z.object({
   APP_ORIGIN: z.string().url(),
   NEXT_PUBLIC_SUPABASE_URL: z.string().url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
+  INVITE_SIGNING_SECRET: z.string().min(32),
 });
 
 export const serverEnv = serverEnvSchema.parse({
@@ -16,4 +17,5 @@ export const serverEnv = serverEnvSchema.parse({
     process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  INVITE_SIGNING_SECRET: process.env.INVITE_SIGNING_SECRET,
 });
