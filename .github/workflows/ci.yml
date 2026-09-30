@@ -49,6 +49,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    env:
+      SUPABASE_AUTH_DISCORD_CLIENT_ID: "123456789012345678"
+      SUPABASE_AUTH_DISCORD_SECRET: "ci-discord-secret-placeholder"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4

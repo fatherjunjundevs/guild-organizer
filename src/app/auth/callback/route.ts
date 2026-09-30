@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSafeNextPath } from "@/features/auth/redirects";
+import { serverEnv } from "@/lib/env/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   if (!code) {
     return NextResponse.redirect(
-      new URL("/auth/error?reason=missing_code", request.url),
+      new URL("/auth/error?reason=missing_code", serverEnv.APP_ORIGIN),
     );
   }
 
@@ -19,9 +20,11 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL("/auth/error?reason=callback_failed", request.url),
+      new URL("/auth/error?reason=callback_failed", serverEnv.APP_ORIGIN),
     );
   }
 
-  return NextResponse.redirect(new URL(nextPath, request.url));
+  return NextResponse.redirect(
+    new URL(nextPath, serverEnv.APP_ORIGIN),
+  );
 }
