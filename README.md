@@ -1,36 +1,132 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ragnarok: The New World ? Guild Organizer
 
-## Getting Started
+An unofficial community tool for organizing guild rosters, events, assignments, and published lineups for Ragnarok: The New World.
 
-First, run the development server:
+## Current Development Status
+
+Phase 3.1 ? Application Foundation
+
+- Next.js App Router + TypeScript
+- Tailwind CSS + semantic design tokens
+- Local Supabase development stack
+- Browser/server Supabase clients
+- Vitest + Testing Library
+- Playwright end-to-end testing
+- GitHub Actions CI
+
+## Requirements
+
+- Node.js 24
+- pnpm 12
+- Docker Desktop
+- Supabase CLI
+
+## Local Setup
+
+Clone the repository and install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Start Docker Desktop, then start the local Supabase stack:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm db:start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy the environment template:
 
-## Learn More
+```text
+.env.example -> .env.local
+```
 
-To learn more about Next.js, take a look at the following resources:
+Configure `.env.local` with your local Supabase Project URL and publishable key.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The default local ports for this development environment are:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- API: http://127.0.0.1:55421
+- Database: 127.0.0.1:55422
+- Studio: http://127.0.0.1:55423
+- Mailpit: http://127.0.0.1:55424
 
-## Deploy on Vercel
+Start the Next.js development server:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+pnpm dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Then open:
+
+```text
+http://localhost:3000
+```
+
+The development-only design system playground is available at:
+
+```text
+http://localhost:3000/design-system
+```
+
+## Quality Checks
+
+Run linting:
+
+```bash
+pnpm lint
+```
+
+Run unit/component tests:
+
+```bash
+pnpm test
+```
+
+Run end-to-end tests:
+
+```bash
+pnpm test:e2e
+```
+
+Run the production build:
+
+```bash
+pnpm build
+```
+
+## Database Commands
+
+```bash
+pnpm db:start
+pnpm db:stop
+pnpm db:status
+pnpm db:reset
+```
+
+## Architecture
+
+The application is organized around four primary experiences:
+
+- Public
+- Management
+- Event Focus
+- Member
+
+Core product model:
+
+```text
+Event Type -> Template -> Event -> Event-owned Structure -> Assignments -> Published Version
+```
+
+Published views are intentionally separated from draft management state.
+
+## Security
+
+- Never commit `.env.local`.
+- Never expose Supabase secret/service-role keys to browser code.
+- Browser code uses only the Supabase publishable key.
+- Row Level Security and transactional RPCs will be authoritative for protected application data.
+
+## Disclaimer
+
+This is an unofficial community project and is not affiliated with the game publisher.
