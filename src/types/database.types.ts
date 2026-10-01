@@ -251,6 +251,9 @@ isOneToOne: false
 "create_guild_invite":
 { Args: { "p_expires_at": string,"p_guild_id": string,"p_invite_kind": string,"p_role": string,"p_token_digest": string }; Returns: string
                            },
+"create_roster_character":
+{ Args: { "p_class_name"?: string,"p_designation"?: string,"p_gear_score"?: number,"p_gender"?: string,"p_guild_id": string,"p_guild_position"?: string,"p_ign": string,"p_level"?: number,"p_online_status"?: string,"p_role_label"?: string,"p_title"?: string,"p_total_contribution"?: number,"p_weekly_activity"?: number,"p_weekly_contribution"?: number }; Returns: string
+                           },
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
                            },
@@ -273,6 +276,12 @@ isOneToOne: false
 "revoke_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
                            },
+"set_character_manual_status":
+{ Args: { "p_character_id": string,"p_status": string }; Returns: undefined
+                           },
+"set_character_roster_profile":
+{ Args: { "p_character_id": string,"p_designation": string,"p_role_label": string }; Returns: undefined
+                           },
 "set_guild_membership_role":
 { Args: { "p_membership_id": string,"p_role": string }; Returns: undefined
                            },
@@ -281,6 +290,9 @@ isOneToOne: false
                            },
 "transfer_guild_ownership":
 { Args: { "p_guild_id": string,"p_new_owner_membership_id": string }; Returns: undefined
+                           },
+"update_roster_character":
+{ Args: { "p_character_id": string,"p_class_name": string,"p_gear_score": number,"p_gender": string,"p_guild_position": string,"p_ign": string,"p_level": number,"p_online_status": string,"p_title": string,"p_total_contribution": number,"p_weekly_activity": number,"p_weekly_contribution": number }; Returns: undefined
                            }
           }
           Enums: {
