@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { getGuildAccess } from "@/features/guilds/server";
 import { signInWithDiscord } from "@/features/auth/actions";
 import { getAuthViewer } from "@/features/auth/viewer";
 import { acceptGuildInviteAction } from "@/features/invites/actions";
@@ -47,6 +49,8 @@ export default async function GuildInvitePage({
     : null;
 
   const viewer = invite ? await getAuthViewer() : null;
+  const existingAccess =
+  invite && viewer ? await getGuildAccess(invite.guildId) : null;
   const errorValue = Array.isArray(query.error)
     ? query.error[0]
     : query.error;
@@ -102,34 +106,58 @@ export default async function GuildInvitePage({
 
             <div className="mt-7">
               {viewer ? (
-                <>
-                  <p className="mb-3 text-sm text-[var(--text-secondary)]">
-                    Signed in as{" "}
-                    <span className="font-semibold text-[var(--text-primary)]">
-                      {viewer.displayName}
-                    </span>
-                  </p>
+  existingAccess ? (
+    <>
+      <p className="mb-3 text-sm text-[var(--text-secondary)]">
+        Signed in as{" "}
+        <span className="font-semibold text-[var(--text-primary)]">
+          {viewer.displayName}
+        </span>
+      </p>
 
-                  <form action={acceptGuildInviteAction}>
-                    <input type="hidden" name="token" value={token} />
-                    <input
-                      type="hidden"
-                      name="generation"
-                      value={invite.generation}
-                    />
-                    <Button type="submit" size="lg">
-                      Accept invitation
-                    </Button>
-                  </form>
-                </>
-              ) : (
-                <form action={signInWithDiscord}>
-                  <input type="hidden" name="next" value={nextPath} />
-                  <Button type="submit" size="lg">
-                    Sign in with Discord to continue
-                  </Button>
-                </form>
-              )}
+      <div className="rounded-[var(--radius-md)] border border-[var(--accent-border)] bg-[var(--accent-soft)] p-4">
+        <p className="text-sm font-semibold text-[var(--accent)]">
+          You are already a member of this Guild.
+        </p>
+      </div>
+
+      <Link
+        href={existingAccess.destination}
+        className="mt-4 inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-[15px] font-semibold text-[#07101f] transition-colors hover:bg-[var(--accent-hover)]"
+      >
+        Open Guild
+      </Link>
+    </>
+  ) : (
+    <>
+      <p className="mb-3 text-sm text-[var(--text-secondary)]">
+        Signed in as{" "}
+        <span className="font-semibold text-[var(--text-primary)]">
+          {viewer.displayName}
+        </span>
+      </p>
+
+      <form action={acceptGuildInviteAction}>
+        <input type="hidden" name="token" value={token} />
+        <input
+          type="hidden"
+          name="generation"
+          value={invite.generation}
+        />
+        <Button type="submit" size="lg">
+          Accept invitation
+        </Button>
+      </form>
+    </>
+  )
+) : (
+  <form action={signInWithDiscord}>
+    <input type="hidden" name="next" value={nextPath} />
+    <Button type="submit" size="lg">
+      Sign in with Discord to continue
+    </Button>
+  </form>
+)}
             </div>
 
             <p className="mt-7 text-xs leading-5 text-[var(--text-tertiary)]">

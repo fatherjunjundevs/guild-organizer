@@ -1,5 +1,9 @@
-import { getGuildAccess } from "@/features/guilds/server";
 import { redirect } from "next/navigation";
+import { getGuildAccess } from "@/features/guilds/server";
+import {
+  listManageableGuildInvites,
+} from "@/features/invites/server";
+import { InviteManager } from "@/features/invites/invite-manager";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
@@ -14,6 +18,8 @@ export default async function GuildDashboardPage({
   if (!access || access.role === "member") {
     redirect("/app");
   }
+
+  const invites = await listManageableGuildInvites(guildId);
 
   return (
     <div className="px-5 py-8 sm:px-8 lg:px-10">
@@ -53,6 +59,20 @@ export default async function GuildDashboardPage({
             <p className="mt-2 text-xl font-semibold">0 active</p>
           </Surface>
         </div>
+
+        {invites ? (
+          <InviteManager guildId={guildId} invites={invites} />
+        ) : (
+          <Surface level={2} className="mt-10 p-5">
+            <p className="font-semibold">
+              Invitation management unavailable
+            </p>
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+              Your current Guild role does not have permission to manage
+              invitations.
+            </p>
+          </Surface>
+        )}
       </div>
     </div>
   );

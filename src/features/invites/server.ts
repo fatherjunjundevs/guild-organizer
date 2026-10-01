@@ -21,6 +21,20 @@ export type ResolvedGuildInvite = {
   expiresAt: string;
 };
 
+export type ManagedGuildInvite = {
+  inviteId: string;
+  inviteKind: string;
+  role: GuildInviteRole;
+  generation: number;
+  status: string;
+  useCount: number;
+  maxUses: number | null;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  isExpired: boolean;
+};
+
 function buildInviteUrl(generation: number, token: string) {
   return new URL(
     buildInvitePath(generation, token),
@@ -108,6 +122,51 @@ export async function revokeGuildInvite(inviteId: string) {
   if (error) {
     throw new Error("Unable to revoke guild invitation.");
   }
+}
+
+export async function listManageableGuildInvites(
+  guildId: string,
+): Promise<ManagedGuildInvite[] | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(
+    "list_manageable_guild_invites",
+    {
+      p_guild_id: guildId,
+    },
+  );
+
+  if (error) {
+    return null;
+  }
+
+  const referenceNow = Date.now();
+
+  return (data ?? []).flatMap((invite) => {
+    if (
+      invite.invite_role !== "member" &&
+      invite.invite_role !== "officer" &&
+      invite.invite_role !== "admin"
+    ) {
+      return [];
+    }
+
+    return [
+      {
+        inviteId: invite.invite_id,
+        inviteKind: invite.invite_kind,
+        role: invite.invite_role,
+        generation: invite.generation,
+        status: invite.status,
+        useCount: invite.use_count,
+        maxUses: invite.max_uses,
+        expiresAt: invite.expires_at,
+        createdAt: invite.created_at,
+        updatedAt: invite.updated_at,
+        isExpired:
+          new Date(invite.expires_at).getTime() <= referenceNow,
+      },
+    ];
+  });
 }
 
 export async function resolveGuildInviteLink(

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthViewer } from "@/features/auth/viewer";
-import { createClient } from "@/lib/supabase/server";
+import { getGuildAccess } from "@/features/guilds/server";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
@@ -29,15 +29,10 @@ export default async function InviteSuccessPage({
     redirect("/");
   }
 
-  const supabase = await createClient();
-  const { data: guild } = await supabase
-    .from("guilds")
-    .select("name")
-    .eq("id", guildId)
-    .maybeSingle();
+  const access = await getGuildAccess(guildId);
 
-  if (!guild) {
-    redirect("/");
+  if (!access) {
+    redirect("/app");
   }
 
   return (
@@ -47,19 +42,22 @@ export default async function InviteSuccessPage({
           <StatusChip tone="success">Invitation accepted</StatusChip>
 
           <h1 className="mt-4 text-3xl font-semibold tracking-[-0.03em]">
-            You joined {guild.name}
+            You joined {access.guildName}
           </h1>
 
           <p className="mt-3 leading-7 text-[var(--text-secondary)]">
-            Your Guild membership is active. The Guild workspace will
-            become your main destination as we finish the access shell.
+            Your Guild membership is active with the{" "}
+            <span className="font-semibold capitalize text-[var(--text-primary)]">
+              {access.role}
+            </span>{" "}
+            role.
           </p>
 
           <Link
-            href="/"
-            className="mt-7 inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-2)] px-4 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-3)]"
+            href={access.destination}
+            className="mt-7 inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-[15px] font-semibold text-[#07101f] transition-colors hover:bg-[var(--accent-hover)]"
           >
-            Return home
+            Open Guild
           </Link>
         </Surface>
       </div>

@@ -204,6 +204,11 @@ isOneToOne: false
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
                            },
+"list_manageable_guild_invites":
+{ Args: { "p_guild_id": string }; Returns: {
+              "created_at": string,"expires_at": string,"generation": number,"invite_id": string,"invite_kind": string,"invite_role": string,"max_uses": number,"status": string,"updated_at": string,"use_count": number
+            }[]
+                           },
 "regenerate_guild_invite":
 { Args: { "p_expires_at": string,"p_invite_id": string,"p_token_digest": string }; Returns: number
                            },
