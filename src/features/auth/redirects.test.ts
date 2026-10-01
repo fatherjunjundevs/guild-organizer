@@ -29,6 +29,12 @@ describe("getSafeNextPath", () => {
     );
   });
 
+  it("rejects a javascript URL", () => {
+    expect(
+      getSafeNextPath("javascript:alert(document.domain)"),
+    ).toBe(DEFAULT_AFTER_AUTH_PATH);
+  });
+
   it("uses the provided fallback for missing values", () => {
     expect(getSafeNextPath(null, "/login")).toBe("/login");
   });
