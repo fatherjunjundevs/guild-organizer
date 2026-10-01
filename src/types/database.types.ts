@@ -236,6 +236,31 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"roster_sync_runs": {
+                  Row: {
+                    "applied_at": string,"created_at": string,"created_count": number,"guild_id": string,"id": string,"imported_by": string | null,"left_guild_count": number,"reactivated_count": number,"source_filename": string,"source_row_count": number,"source_sha256": string,"source_type": string,"unchanged_count": number,"updated_count": number
+                  }
+                  Insert: {
+                    "applied_at"?: string,"created_at"?: string,"created_count"?: number,"guild_id": string,"id"?: string,"imported_by"?: string | null,"left_guild_count"?: number,"reactivated_count"?: number,"source_filename": string,"source_row_count": number,"source_sha256": string,"source_type"?: string,"unchanged_count"?: number,"updated_count"?: number
+                  }
+                  Update: {
+                    "applied_at"?: string,"created_at"?: string,"created_count"?: number,"guild_id"?: string,"id"?: string,"imported_by"?: string | null,"left_guild_count"?: number,"reactivated_count"?: number,"source_filename"?: string,"source_row_count"?: number,"source_sha256"?: string,"source_type"?: string,"unchanged_count"?: number,"updated_count"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "roster_sync_runs_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "roster_sync_runs_imported_by_fkey"
+      columns: ["imported_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -244,6 +269,11 @@ isOneToOne: false
           Functions: {
             "accept_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: string
+                           },
+"apply_rtnw_roster_sync":
+{ Args: { "p_guild_id": string,"p_rows": Json,"p_source_filename": string,"p_source_sha256": string }; Returns: {
+              "created_count": number,"left_guild_count": number,"reactivated_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
+            }[]
                            },
 "create_guild":
 { Args: { "p_name": string }; Returns: string
@@ -260,6 +290,11 @@ isOneToOne: false
 "list_manageable_guild_invites":
 { Args: { "p_guild_id": string }; Returns: {
               "created_at": string,"expires_at": string,"generation": number,"invite_id": string,"invite_kind": string,"invite_role": string,"max_uses": number,"status": string,"updated_at": string,"use_count": number
+            }[]
+                           },
+"preview_rtnw_roster_sync":
+{ Args: { "p_guild_id": string,"p_rows": Json }; Returns: {
+              "change_kind": string,"character_id": string,"ign": string
             }[]
                            },
 "regenerate_guild_invite":
