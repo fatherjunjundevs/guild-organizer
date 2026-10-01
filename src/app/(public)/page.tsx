@@ -1,8 +1,13 @@
+import Link from "next/link";
+import { signInWithDiscord, signOut } from "@/features/auth/actions";
+import { getAuthViewer } from "@/features/auth/viewer";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const viewer = await getAuthViewer();
+
   return (
     <main className="min-h-screen px-5 py-10 sm:px-8 lg:px-12">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center">
@@ -24,11 +29,36 @@ export default function HomePage() {
               they belong.
             </p>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg">Guild Organizer</Button>
-              <Button variant="secondary" size="lg">
-                Design Foundation
-              </Button>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              {viewer ? (
+                <>
+                  <StatusChip tone="success">Signed in</StatusChip>
+
+                  <span className="text-sm text-[var(--text-secondary)]">
+                    {viewer.displayName}
+                  </span>
+
+                  <Link
+                    href="/app"
+                    className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-5 text-[15px] font-semibold text-[#07101f] transition-colors hover:bg-[var(--accent-hover)]"
+                  >
+                    Open Guild Organizer
+                  </Link>
+
+                  <form action={signOut}>
+                    <Button type="submit" variant="secondary" size="lg">
+                      Sign out
+                    </Button>
+                  </form>
+                </>
+              ) : (
+                <form action={signInWithDiscord}>
+                  <input type="hidden" name="next" value="/app" />
+                  <Button type="submit" size="lg">
+                    Sign in with Discord
+                  </Button>
+                </form>
+              )}
             </div>
 
             <p className="mt-8 text-sm text-[var(--text-tertiary)]">

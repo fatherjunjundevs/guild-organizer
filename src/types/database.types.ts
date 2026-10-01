@@ -36,6 +36,68 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"guild_invite_acceptances": {
+                  Row: {
+                    "accepted_at": string,"accepted_role": string,"guild_id": string,"id": string,"invite_generation": number,"invite_id": string,"membership_id": string | null,"user_id": string | null
+                  }
+                  Insert: {
+                    "accepted_at"?: string,"accepted_role": string,"guild_id": string,"id"?: string,"invite_generation": number,"invite_id": string,"membership_id"?: string | null,"user_id"?: string | null
+                  }
+                  Update: {
+                    "accepted_at"?: string,"accepted_role"?: string,"guild_id"?: string,"id"?: string,"invite_generation"?: number,"invite_id"?: string,"membership_id"?: string | null,"user_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "guild_invite_acceptances_invite_fk"
+      columns: ["guild_id","invite_id"]
+isOneToOne: false
+      referencedRelation: "guild_invites"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "guild_invite_acceptances_membership_id_fkey"
+      columns: ["membership_id"]
+isOneToOne: false
+      referencedRelation: "guild_memberships"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "guild_invite_acceptances_user_id_fkey"
+      columns: ["user_id"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"guild_invites": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"expires_at": string,"generation": number,"guild_id": string,"id": string,"invite_kind": string,"last_used_at": string | null,"max_uses": number | null,"revoked_at": string | null,"revoked_by": string | null,"role": string,"status": string,"token_digest": string,"updated_at": string,"use_count": number
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"expires_at": string,"generation"?: number,"guild_id": string,"id"?: string,"invite_kind": string,"last_used_at"?: string | null,"max_uses"?: number | null,"revoked_at"?: string | null,"revoked_by"?: string | null,"role": string,"status"?: string,"token_digest": string,"updated_at"?: string,"use_count"?: number
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"expires_at"?: string,"generation"?: number,"guild_id"?: string,"id"?: string,"invite_kind"?: string,"last_used_at"?: string | null,"max_uses"?: number | null,"revoked_at"?: string | null,"revoked_by"?: string | null,"role"?: string,"status"?: string,"token_digest"?: string,"updated_at"?: string,"use_count"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "guild_invites_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "guild_invites_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "guild_invites_revoked_by_fkey"
+      columns: ["revoked_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"guild_memberships": {
                   Row: {
                     "created_at": string,"guild_id": string,"id": string,"joined_at": string,"role": string,"status": string,"updated_at": string,"user_id": string
@@ -130,11 +192,33 @@ isOneToOne: false
             [_ in never]: never
           }
           Functions: {
-            "create_guild":
+            "accept_guild_invite":
+{ Args: { "p_generation": number,"p_token_digest": string }; Returns: string
+                           },
+"create_guild":
 { Args: { "p_name": string }; Returns: string
+                           },
+"create_guild_invite":
+{ Args: { "p_expires_at": string,"p_guild_id": string,"p_invite_kind": string,"p_role": string,"p_token_digest": string }; Returns: string
                            },
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
+                           },
+"list_manageable_guild_invites":
+{ Args: { "p_guild_id": string }; Returns: {
+              "created_at": string,"expires_at": string,"generation": number,"invite_id": string,"invite_kind": string,"invite_role": string,"max_uses": number,"status": string,"updated_at": string,"use_count": number
+            }[]
+                           },
+"regenerate_guild_invite":
+{ Args: { "p_expires_at": string,"p_invite_id": string,"p_token_digest": string }; Returns: number
+                           },
+"resolve_guild_invite":
+{ Args: { "p_generation": number,"p_token_digest": string }; Returns: {
+              "expires_at": string,"generation": number,"guild_id": string,"guild_name": string,"invite_id": string,"invite_kind": string,"invite_role": string
+            }[]
+                           },
+"revoke_guild_invite":
+{ Args: { "p_invite_id": string }; Returns: undefined
                            },
 "revoke_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
