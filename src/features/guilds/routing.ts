@@ -9,6 +9,10 @@ export function isGuildRole(value: string): value is GuildRole {
   );
 }
 
+export function isManagementGuildRole(role: GuildRole) {
+  return role === "owner" || role === "admin" || role === "officer";
+}
+
 export function getGuildDestination(
   guildId: string,
   role: GuildRole,
@@ -18,4 +22,8 @@ export function getGuildDestination(
   }
 
   return `/app/guild/${guildId}/dashboard`;
+}
+
+export function getGuildExperienceLabel(role: GuildRole) {
+  return isManagementGuildRole(role) ? "Manage" : "Member view";
 }

@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 import { getAuthViewer } from "@/features/auth/viewer";
-import { getGuildAccess } from "@/features/guilds/server";
+import {
+  getGuildAccess,
+  getGuildMembershipSummaries,
+} from "@/features/guilds/server";
 import { MemberShell } from "@/features/guilds/member-shell";
 
 export default async function GuildMemberLayout({
@@ -17,11 +20,22 @@ export default async function GuildMemberLayout({
   }
 
   const { guildId } = await params;
-  const access = await getGuildAccess(guildId);
+  const [access, memberships] = await Promise.all([
+    getGuildAccess(guildId),
+    getGuildMembershipSummaries(),
+  ]);
 
   if (!access) {
     redirect("/app");
   }
 
-  return <MemberShell access={access}>{children}</MemberShell>;
+  if (access.role !== "member") {
+    redirect(access.destination);
+  }
+
+  return (
+    <MemberShell access={access} memberships={memberships}>
+      {children}
+    </MemberShell>
+  );
 }

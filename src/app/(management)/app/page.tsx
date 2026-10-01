@@ -2,7 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getAuthViewer } from "@/features/auth/viewer";
 import { createGuildAction } from "@/features/guilds/actions";
-import { getGuildMembershipSummaries } from "@/features/guilds/server";
+import {
+  getGuildMembershipSummaries,
+  type GuildMembershipSummary,
+} from "@/features/guilds/server";
+import {
+  getGuildExperienceLabel,
+  isManagementGuildRole,
+} from "@/features/guilds/routing";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
@@ -12,6 +19,33 @@ type GuildHubPageProps = {
     error?: string | string[];
   }>;
 };
+
+function GuildCard({
+  guild,
+}: {
+  guild: GuildMembershipSummary;
+}) {
+  return (
+    <Link href={guild.destination}>
+      <Surface
+        level={2}
+        className="h-full p-5 transition-colors hover:bg-[var(--surface-3)]"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="truncate font-semibold">{guild.guildName}</h3>
+            <p className="mt-1 text-sm text-[var(--text-tertiary)]">
+              {guild.role.charAt(0).toUpperCase()}
+              {guild.role.slice(1)} · {getGuildExperienceLabel(guild.role)}
+            </p>
+          </div>
+
+          <span className="shrink-0 text-[var(--accent)]">Open →</span>
+        </div>
+      </Surface>
+    </Link>
+  );
+}
 
 export default async function GuildHubPage({
   searchParams,
@@ -23,6 +57,13 @@ export default async function GuildHubPage({
   }
 
   const guilds = await getGuildMembershipSummaries();
+  const managementGuilds = guilds.filter((guild) =>
+    isManagementGuildRole(guild.role),
+  );
+  const memberGuilds = guilds.filter(
+    (guild) => !isManagementGuildRole(guild.role),
+  );
+
   const query = await searchParams;
   const errorValue = Array.isArray(query.error)
     ? query.error[0]
@@ -45,40 +86,60 @@ export default async function GuildHubPage({
               Your Guilds
             </h1>
             <p className="mt-2 text-[var(--text-secondary)]">
-              Welcome, {viewer.displayName}. Choose a Guild or create one.
+              Welcome, {viewer.displayName}. Choose the Guild experience
+              you want to open.
             </p>
           </div>
+
+          {guilds.length > 1 ? (
+            <StatusChip tone="accent">
+              {guilds.length} active Guilds
+            </StatusChip>
+          ) : null}
         </div>
 
         {guilds.length > 0 ? (
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold tracking-[0.12em] text-[var(--text-tertiary)] uppercase">
-              Active memberships
-            </h2>
+          <div className="mt-8 space-y-8">
+            {managementGuilds.length > 0 ? (
+              <section>
+                <h2 className="text-sm font-semibold tracking-[0.12em] text-[var(--text-tertiary)] uppercase">
+                  Manage
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Guilds where you are an Owner, Admin, or Officer.
+                </p>
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              {guilds.map((guild) => (
-                <Link key={guild.membershipId} href={guild.destination}>
-                  <Surface
-                    level={2}
-                    className="h-full p-5 transition-colors hover:bg-[var(--surface-3)]"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold">{guild.guildName}</h3>
-                        <p className="mt-1 text-sm text-[var(--text-tertiary)]">
-                          {guild.role.charAt(0).toUpperCase()}
-                          {guild.role.slice(1)}
-                        </p>
-                      </div>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  {managementGuilds.map((guild) => (
+                    <GuildCard
+                      key={guild.membershipId}
+                      guild={guild}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
-                      <span className="text-[var(--accent)]">Open →</span>
-                    </div>
-                  </Surface>
-                </Link>
-              ))}
-            </div>
-          </section>
+            {memberGuilds.length > 0 ? (
+              <section>
+                <h2 className="text-sm font-semibold tracking-[0.12em] text-[var(--text-tertiary)] uppercase">
+                  Member
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Guilds where you use the member experience.
+                </p>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  {memberGuilds.map((guild) => (
+                    <GuildCard
+                      key={guild.membershipId}
+                      guild={guild}
+                    />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
         ) : (
           <Surface level={2} className="mt-8 p-5">
             <p className="font-semibold">No Guild memberships yet</p>

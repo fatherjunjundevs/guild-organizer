@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { signOut } from "@/features/auth/actions";
-import type { GuildAccess } from "@/features/guilds/server";
+import type {
+  GuildAccess,
+  GuildMembershipSummary,
+} from "@/features/guilds/server";
+import { GuildSwitcher } from "@/features/guilds/guild-switcher";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 
 export function ManagementShell({
   access,
+  memberships,
   children,
 }: {
   access: GuildAccess;
+  memberships: GuildMembershipSummary[];
   children: React.ReactNode;
 }) {
   const roleLabel =
@@ -16,18 +22,26 @@ export function ManagementShell({
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[var(--management-sidebar-expanded)_1fr]">
-      <aside className="border-b border-[var(--border-subtle)] bg-[var(--surface-1)] lg:min-h-screen lg:border-r lg:border-b-0">
+      <aside className="relative z-20 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] lg:min-h-screen lg:border-r lg:border-b-0">
         <div className="flex min-h-16 items-center justify-between gap-4 px-5 lg:block lg:px-4 lg:py-5">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold tracking-[0.14em] text-[var(--text-tertiary)] uppercase">
               Guild Command Center
             </p>
-            <h1 className="mt-1 font-semibold text-[var(--text-primary)]">
+            <h1 className="mt-1 truncate font-semibold text-[var(--text-primary)]">
               {access.guildName}
             </h1>
           </div>
 
           <StatusChip tone="accent">{roleLabel}</StatusChip>
+        </div>
+
+        <div className="px-5 pb-4 lg:px-3">
+          <GuildSwitcher
+            memberships={memberships}
+            currentGuildId={access.guildId}
+            align="start"
+          />
         </div>
 
         <nav
@@ -50,14 +64,7 @@ export function ManagementShell({
           </div>
 
           <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
-            <Link
-              href="/app"
-              className="flex h-10 items-center rounded-[var(--radius-md)] px-3 text-sm text-[var(--text-secondary)] hover:bg-[var(--surface-2)] hover:text-[var(--text-primary)]"
-            >
-              Switch Guild
-            </Link>
-
-            <form action={signOut} className="mt-1">
+            <form action={signOut}>
               <Button
                 type="submit"
                 variant="ghost"
@@ -70,7 +77,7 @@ export function ManagementShell({
         </nav>
       </aside>
 
-      <main className="min-w-0 bg-[var(--bg-canvas)]">
+      <main className="relative z-0 min-w-0 bg-[var(--bg-canvas)]">
         {children}
       </main>
     </div>
