@@ -36,6 +36,56 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"character_roster_profiles": {
+                  Row: {
+                    "character_id": string,"created_at": string,"created_by": string | null,"designation": string | null,"guild_id": string,"role_label": string | null,"updated_at": string
+                  }
+                  Insert: {
+                    "character_id": string,"created_at"?: string,"created_by"?: string | null,"designation"?: string | null,"guild_id": string,"role_label"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "character_id"?: string,"created_at"?: string,"created_by"?: string | null,"designation"?: string | null,"guild_id"?: string,"role_label"?: string | null,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "character_roster_profiles_character_fk"
+      columns: ["guild_id","character_id"]
+isOneToOne: true
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_roster_profiles_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"characters": {
+                  Row: {
+                    "class_name": string | null,"created_at": string,"created_by": string | null,"gear_score": number | null,"gender": string | null,"guild_id": string,"guild_position": string | null,"id": string,"ign": string,"inactive_reason": string | null,"left_guild_at": string | null,"level": number | null,"online_status": string | null,"rtnw_first_seen_at": string | null,"rtnw_last_seen_at": string | null,"source_origin": string,"status": string,"title": string | null,"total_contribution": number | null,"updated_at": string,"weekly_activity": number | null,"weekly_contribution": number | null
+                  }
+                  Insert: {
+                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id": string,"guild_position"?: string | null,"id"?: string,"ign": string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
+                  }
+                  Update: {
+                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id"?: string,"guild_position"?: string | null,"id"?: string,"ign"?: string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "characters_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "characters_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"guild_invite_acceptances": {
                   Row: {
                     "accepted_at": string,"accepted_role": string,"guild_id": string,"id": string,"invite_generation": number,"invite_id": string,"membership_id": string | null,"user_id": string | null
