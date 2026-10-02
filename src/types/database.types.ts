@@ -275,6 +275,9 @@ isOneToOne: false
               "created_count": number,"left_guild_count": number,"reactivated_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
             }[]
                            },
+"bulk_update_roster_characters":
+{ Args: { "p_action": string,"p_character_ids": (string)[],"p_value": string }; Returns: number
+                           },
 "create_guild":
 { Args: { "p_name": string }; Returns: string
                            },

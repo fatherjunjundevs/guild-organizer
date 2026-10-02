@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BulkRosterDialog } from "@/features/roster/bulk-roster-dialog";
 import { CharacterOrganizerDialog } from "@/features/roster/character-organizer-dialog";
 import type { MasterRosterCharacter } from "@/features/roster/server";
 import {
@@ -49,6 +50,9 @@ export function RosterView({
     useState<RosterSort>("position-hierarchy");
   const [selectedCharacter, setSelectedCharacter] =
     useState<MasterRosterCharacter | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const summary = useMemo(
     () => getRosterSummary(characters),
@@ -68,6 +72,54 @@ export function RosterView({
       }),
     [characters, query, status, className, sort],
   );
+  const selectedCharacters = useMemo(
+    () =>
+      characters.filter((character) =>
+        selectedIds.has(character.id),
+      ),
+    [characters, selectedIds],
+  );
+  const allVisibleSelected =
+    visibleCharacters.length > 0 &&
+    visibleCharacters.every((character) =>
+      selectedIds.has(character.id),
+    );
+
+  function toggleCharacterSelection(characterId: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (next.has(characterId)) {
+        next.delete(characterId);
+      } else {
+        next.add(characterId);
+      }
+
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (allVisibleSelected) {
+        for (const character of visibleCharacters) {
+          next.delete(character.id);
+        }
+      } else {
+        for (const character of visibleCharacters) {
+          next.add(character.id);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   return (
     <>
@@ -219,23 +271,74 @@ export function RosterView({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
           <p className="text-sm text-[var(--text-secondary)]">
             Showing{" "}
             <span className="font-semibold text-[var(--text-primary)]">
               {visibleCharacters.length}
             </span>{" "}
             of {characters.length} stored characters
+            {selectedIds.size > 0 ? (
+              <>
+                {" · "}
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {selectedIds.size} selected
+                </span>
+              </>
+            ) : null}
           </p>
 
-          {status !== "active" ? (
-            <p className="text-xs text-[var(--text-tertiary)]">
-              Historical rows remain preserved for future event,
-              attendance, and auction history.
-            </p>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {visibleCharacters.length > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={toggleAllVisible}
+              >
+                {allVisibleSelected
+                  ? "Clear shown"
+                  : "Select all shown"}
+              </Button>
+            ) : null}
+
+            {selectedIds.size > 0 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={clearSelection}
+              >
+                Clear selection
+              </Button>
+            ) : null}
+          </div>
         </div>
       </Surface>
+
+      {selectedCharacters.length > 0 ? (
+        <Surface
+          level={2}
+          className="mt-4 flex flex-wrap items-center justify-between gap-3 border-[var(--accent-border)] p-4"
+        >
+          <div>
+            <p className="font-semibold">
+              {selectedCharacters.length} character
+              {selectedCharacters.length === 1 ? "" : "s"} selected
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-tertiary)]">
+              Bulk actions only change organizer-owned fields and manual
+              roster status.
+            </p>
+          </div>
+
+          <BulkRosterDialog
+            guildId={guildId}
+            characters={selectedCharacters}
+            onApplied={clearSelection}
+          />
+        </Surface>
+      ) : null}
 
       {visibleCharacters.length === 0 ? (
         <Surface level={2} className="mt-4 p-8 text-center">
@@ -251,9 +354,12 @@ export function RosterView({
             className="mt-4 hidden overflow-hidden xl:block"
           >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1160px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1210px] border-collapse text-left text-sm">
                 <thead className="bg-[var(--surface-3)] text-xs font-semibold tracking-[0.06em] text-[var(--text-tertiary)] uppercase">
                   <tr>
+                    <th className="w-12 px-4 py-3">
+                      <span className="sr-only">Select</span>
+                    </th>
                     <th className="px-4 py-3">Character</th>
                     <th className="px-4 py-3">Class</th>
                     <th className="px-4 py-3 text-right">Lv.</th>
@@ -275,6 +381,17 @@ export function RosterView({
                       key={character.id}
                       className="border-t border-[var(--border-subtle)]"
                     >
+                      <td className="px-4 py-3.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(character.id)}
+                          onChange={() =>
+                            toggleCharacterSelection(character.id)
+                          }
+                          aria-label={`Select ${character.ign}`}
+                          className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                        />
+                      </td>
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-[var(--text-primary)]">
                           {character.ign}
@@ -346,7 +463,18 @@ export function RosterView({
                     </p>
                   </div>
 
-                  <CharacterStatus character={character} />
+                  <div className="flex shrink-0 items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(character.id)}
+                      onChange={() =>
+                        toggleCharacterSelection(character.id)
+                      }
+                      aria-label={`Select ${character.ign}`}
+                      className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                    />
+                    <CharacterStatus character={character} />
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-[var(--border-subtle)] pt-4 text-sm">
