@@ -162,6 +162,59 @@ describe("roster view model", () => {
     ).toEqual(["2", "3", "1", "4"]);
   });
 
+  it("sorts Guild positions by hierarchy before Gear Score", () => {
+    const hierarchyRows: MasterRosterCharacter[] = [
+      {
+        ...rows[0],
+        id: "emperor",
+        ign: "Mastering",
+        guildPosition: "Emperor",
+        gearScore: 51031,
+      },
+      {
+        ...rows[0],
+        id: "elite",
+        ign: "EliteHighGear",
+        guildPosition: "Elite",
+        gearScore: 99999,
+      },
+      {
+        ...rows[0],
+        id: "raid-low",
+        ign: "RaidLeaderLowGear",
+        guildPosition: "Raid Leader",
+        gearScore: 42000,
+      },
+      {
+        ...rows[0],
+        id: "raid-high",
+        ign: "RaidLeaderHighGear",
+        guildPosition: "Raid Leader",
+        gearScore: 47000,
+      },
+      {
+        ...rows[0],
+        id: "unknown",
+        ign: "UnknownRank",
+        guildPosition: "Special Rank",
+        gearScore: 120000,
+      },
+    ];
+
+    expect(
+      filterAndSortRoster(hierarchyRows, {
+        ...baseOptions,
+        sort: "position-hierarchy",
+      }).map((row) => row.id),
+    ).toEqual([
+      "emperor",
+      "raid-high",
+      "raid-low",
+      "elite",
+      "unknown",
+    ]);
+  });
+
   it("builds unique alphabetized class options", () => {
     expect(getRosterClassOptions(rows)).toEqual([
       "Creator",

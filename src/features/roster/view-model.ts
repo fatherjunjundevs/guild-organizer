@@ -7,6 +7,7 @@ export type RosterStatusFilter =
   | "all";
 
 export type RosterSort =
+  | "position-hierarchy"
   | "gear-desc"
   | "ign-asc"
   | "level-desc"
@@ -17,6 +18,17 @@ export type RosterViewOptions = {
   status: RosterStatusFilter;
   className: string;
   sort: RosterSort;
+};
+
+const GUILD_POSITION_HIERARCHY: Record<string, number> = {
+  emperor: 0,
+  chancellor: 1,
+  commander: 2,
+  duchess: 3,
+  warmaster: 4,
+  "raid leader": 5,
+  elite: 6,
+  member: 7,
 };
 
 function compareNullableNumbersDesc(
@@ -36,6 +48,17 @@ function compareNullableNumbersDesc(
   }
 
   return right - left;
+}
+
+function getGuildPositionHierarchyRank(position: string | null) {
+  if (!position) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return (
+    GUILD_POSITION_HIERARCHY[position.trim().toLocaleLowerCase()] ??
+    Number.MAX_SAFE_INTEGER
+  );
 }
 
 export function getRosterSummary(
@@ -129,6 +152,15 @@ export function filterAndSortRoster(
       return searchable.includes(query);
     })
     .sort((left, right) => {
+      if (options.sort === "position-hierarchy") {
+        return (
+          getGuildPositionHierarchyRank(left.guildPosition) -
+            getGuildPositionHierarchyRank(right.guildPosition) ||
+          compareNullableNumbersDesc(left.gearScore, right.gearScore) ||
+          left.ign.localeCompare(right.ign)
+        );
+      }
+
       if (options.sort === "ign-asc") {
         return left.ign.localeCompare(right.ign);
       }

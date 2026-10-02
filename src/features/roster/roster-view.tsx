@@ -41,7 +41,8 @@ export function RosterView({
   const [status, setStatus] =
     useState<RosterStatusFilter>("active");
   const [className, setClassName] = useState("all");
-  const [sort, setSort] = useState<RosterSort>("gear-desc");
+  const [sort, setSort] =
+    useState<RosterSort>("position-hierarchy");
 
   const summary = useMemo(
     () => getRosterSummary(characters),
@@ -174,6 +175,9 @@ export function RosterView({
               }
               className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
             >
+              <option value="position-hierarchy">
+                Guild Position · Hierarchy
+              </option>
               <option value="gear-desc">Gear Score · High</option>
               <option value="ign-asc">IGN · A–Z</option>
               <option value="level-desc">Level · High</option>
