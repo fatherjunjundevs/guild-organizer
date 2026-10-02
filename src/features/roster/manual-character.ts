@@ -8,6 +8,20 @@ export type ManualCharacterInput = {
   roleLabel: string;
 };
 
+export type ManualCharacterDetailsInput = {
+  ign: string;
+  level: string;
+  className: string;
+  title: string;
+  gender: string;
+  guildPosition: string;
+  gearScore: string;
+  weeklyActivity: string;
+  weeklyContribution: string;
+  totalContribution: string;
+  onlineStatus: string;
+};
+
 export type CharacterOrganizationInput = {
   status: string;
   designation: string;
@@ -24,6 +38,20 @@ export type ParsedManualCharacter = {
   roleLabel?: string;
 };
 
+export type ParsedManualCharacterDetails = {
+  ign: string;
+  level: number | null;
+  className: string | null;
+  title: string | null;
+  gender: string | null;
+  guildPosition: string | null;
+  gearScore: number | null;
+  weeklyActivity: number | null;
+  weeklyContribution: number | null;
+  totalContribution: number | null;
+  onlineStatus: string | null;
+};
+
 export type ParsedCharacterOrganization = {
   status: "active" | "inactive";
   designation: "main" | "sub" | null;
@@ -33,6 +61,22 @@ export type ParsedCharacterOrganization = {
 type ParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; message: string };
+
+function parseExactIgn(value: string): ParseResult<string> {
+  if (
+    value.length < 1 ||
+    value.length > 80 ||
+    value !== value.trim()
+  ) {
+    return {
+      ok: false,
+      message:
+        "IGN must be 1–80 characters with no surrounding whitespace.",
+    };
+  }
+
+  return { ok: true, value };
+}
 
 function optionalTrimmedText(
   value: string,
@@ -104,18 +148,7 @@ function parseDesignation(
 export function parseManualCharacterInput(
   input: ManualCharacterInput,
 ): ParseResult<ParsedManualCharacter> {
-  if (
-    input.ign.length < 1 ||
-    input.ign.length > 80 ||
-    input.ign !== input.ign.trim()
-  ) {
-    return {
-      ok: false,
-      message:
-        "IGN must be 1–80 characters with no surrounding whitespace.",
-    };
-  }
-
+  const ign = parseExactIgn(input.ign);
   const level = optionalNonnegativeInteger(input.level, "Level");
   const className = optionalTrimmedText(
     input.className,
@@ -138,40 +171,89 @@ export function parseManualCharacterInput(
     80,
   );
 
-  if (!level.ok) {
-    return level;
-  }
-
-  if (!className.ok) {
-    return className;
-  }
-
-  if (!guildPosition.ok) {
-    return guildPosition;
-  }
-
-  if (!gearScore.ok) {
-    return gearScore;
-  }
-
-  if (!designation.ok) {
-    return designation;
-  }
-
-  if (!roleLabel.ok) {
-    return roleLabel;
-  }
+  if (!ign.ok) return ign;
+  if (!level.ok) return level;
+  if (!className.ok) return className;
+  if (!guildPosition.ok) return guildPosition;
+  if (!gearScore.ok) return gearScore;
+  if (!designation.ok) return designation;
+  if (!roleLabel.ok) return roleLabel;
 
   return {
     ok: true,
     value: {
-      ign: input.ign,
+      ign: ign.value,
       level: level.value,
       className: className.value,
       guildPosition: guildPosition.value,
       gearScore: gearScore.value,
       designation: designation.value,
       roleLabel: roleLabel.value,
+    },
+  };
+}
+
+export function parseManualCharacterDetailsInput(
+  input: ManualCharacterDetailsInput,
+): ParseResult<ParsedManualCharacterDetails> {
+  const ign = parseExactIgn(input.ign);
+  const level = optionalNonnegativeInteger(input.level, "Level");
+  const className = optionalTrimmedText(input.className, "Class", 80);
+  const title = optionalTrimmedText(input.title, "Title", 120);
+  const gender = optionalTrimmedText(input.gender, "Gender", 40);
+  const guildPosition = optionalTrimmedText(
+    input.guildPosition,
+    "Guild position",
+    80,
+  );
+  const gearScore = optionalNonnegativeInteger(
+    input.gearScore,
+    "Gear Score",
+  );
+  const weeklyActivity = optionalNonnegativeInteger(
+    input.weeklyActivity,
+    "Weekly activity",
+  );
+  const weeklyContribution = optionalNonnegativeInteger(
+    input.weeklyContribution,
+    "Weekly contribution",
+  );
+  const totalContribution = optionalNonnegativeInteger(
+    input.totalContribution,
+    "Total contribution",
+  );
+  const onlineStatus = optionalTrimmedText(
+    input.onlineStatus,
+    "Online status",
+    120,
+  );
+
+  if (!ign.ok) return ign;
+  if (!level.ok) return level;
+  if (!className.ok) return className;
+  if (!title.ok) return title;
+  if (!gender.ok) return gender;
+  if (!guildPosition.ok) return guildPosition;
+  if (!gearScore.ok) return gearScore;
+  if (!weeklyActivity.ok) return weeklyActivity;
+  if (!weeklyContribution.ok) return weeklyContribution;
+  if (!totalContribution.ok) return totalContribution;
+  if (!onlineStatus.ok) return onlineStatus;
+
+  return {
+    ok: true,
+    value: {
+      ign: ign.value,
+      level: level.value ?? null,
+      className: className.value ?? null,
+      title: title.value ?? null,
+      gender: gender.value ?? null,
+      guildPosition: guildPosition.value ?? null,
+      gearScore: gearScore.value ?? null,
+      weeklyActivity: weeklyActivity.value ?? null,
+      weeklyContribution: weeklyContribution.value ?? null,
+      totalContribution: totalContribution.value ?? null,
+      onlineStatus: onlineStatus.value ?? null,
     },
   };
 }
@@ -193,13 +275,8 @@ export function parseCharacterOrganizationInput(
     80,
   );
 
-  if (!designation.ok) {
-    return designation;
-  }
-
-  if (!roleLabel.ok) {
-    return roleLabel;
-  }
+  if (!designation.ok) return designation;
+  if (!roleLabel.ok) return roleLabel;
 
   return {
     ok: true,

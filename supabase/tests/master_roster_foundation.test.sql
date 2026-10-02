@@ -229,7 +229,15 @@ select is(
   (
     select count(*)
     from public.characters
-    where ign = '焱｜Chocobi'
+    where id in (
+      '73000000-0000-0000-0000-000000000001',
+      '74000000-0000-0000-0000-000000000001'
+    )
+      and ign = (
+        select ign
+        from public.characters
+        where id = '73000000-0000-0000-0000-000000000001'
+      )
   ),
   2::bigint,
   'the same exact IGN may exist in different Guilds'

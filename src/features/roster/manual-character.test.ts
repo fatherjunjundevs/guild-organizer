@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   parseCharacterOrganizationInput,
+  parseManualCharacterDetailsInput,
   parseManualCharacterInput,
 } from "@/features/roster/manual-character";
 
@@ -115,6 +116,110 @@ describe("manual roster character input", () => {
 
     expect(main.ok && main.value.designation).toBe("main");
     expect(sub.ok && sub.value.designation).toBe("sub");
+  });
+});
+
+describe("manual character detail editing", () => {
+  it("parses the complete editable game-field set", () => {
+    const result = parseManualCharacterDetailsInput({
+      ign: "焱｜ManualPriest",
+      level: "83",
+      className: "High Priest",
+      title: "Pathfinder I",
+      gender: "F",
+      guildPosition: "Elite",
+      gearScore: "56000",
+      weeklyActivity: "820",
+      weeklyContribution: "2400",
+      totalContribution: "18000",
+      onlineStatus: "[Online]",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ign: "焱｜ManualPriest",
+        level: 83,
+        className: "High Priest",
+        title: "Pathfinder I",
+        gender: "F",
+        guildPosition: "Elite",
+        gearScore: 56000,
+        weeklyActivity: 820,
+        weeklyContribution: 2400,
+        totalContribution: 18000,
+        onlineStatus: "[Online]",
+      },
+    });
+  });
+
+  it("turns blank optional detail fields into null so they can be cleared", () => {
+    const result = parseManualCharacterDetailsInput({
+      ign: "ManualCharacter",
+      level: "",
+      className: " ",
+      title: "",
+      gender: "",
+      guildPosition: "",
+      gearScore: "",
+      weeklyActivity: "",
+      weeklyContribution: "",
+      totalContribution: "",
+      onlineStatus: "",
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        ign: "ManualCharacter",
+        level: null,
+        className: null,
+        title: null,
+        gender: null,
+        guildPosition: null,
+        gearScore: null,
+        weeklyActivity: null,
+        weeklyContribution: null,
+        totalContribution: null,
+        onlineStatus: null,
+      },
+    });
+  });
+
+  it("rejects surrounding whitespace on edited IGN", () => {
+    expect(
+      parseManualCharacterDetailsInput({
+        ign: " ManualCharacter ",
+        level: "",
+        className: "",
+        title: "",
+        gender: "",
+        guildPosition: "",
+        gearScore: "",
+        weeklyActivity: "",
+        weeklyContribution: "",
+        totalContribution: "",
+        onlineStatus: "",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("rejects invalid numeric detail fields", () => {
+    expect(
+      parseManualCharacterDetailsInput({
+        ign: "ManualCharacter",
+        level: "80",
+        className: "",
+        title: "",
+        gender: "",
+        guildPosition: "",
+        gearScore: "55.5",
+        weeklyActivity: "",
+        weeklyContribution: "",
+        totalContribution: "",
+        onlineStatus: "",
+      }).ok,
+    ).toBe(false);
   });
 });
 
