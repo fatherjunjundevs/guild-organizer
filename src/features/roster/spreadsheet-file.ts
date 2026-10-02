@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import ExcelJS from "exceljs-hardened";
 import type {
   SpreadsheetCell,
@@ -229,6 +228,17 @@ async function readXlsx(bytes: Uint8Array) {
   return buildGrid(records, rowNumbers, worksheet.name);
 }
 
+async function sha256Hex(bytes: Uint8Array) {
+  const digest = await globalThis.crypto.subtle.digest(
+    "SHA-256",
+    new Uint8Array(bytes).buffer,
+  );
+
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 export async function readGenericSpreadsheetBytes(input: {
   filename: string;
   bytes: Uint8Array;
@@ -280,9 +290,7 @@ export async function readGenericSpreadsheetBytes(input: {
     return {
       ok: true,
       filename,
-      sha256: createHash("sha256")
-        .update(input.bytes)
-        .digest("hex"),
+      sha256: await sha256Hex(input.bytes),
       grid,
     };
   } catch (error) {

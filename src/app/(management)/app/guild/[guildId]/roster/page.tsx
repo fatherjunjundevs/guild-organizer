@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AddCharacterDialog } from "@/features/roster/add-character-dialog";
+import { GenericSpreadsheetImportDialog } from "@/features/roster/generic-spreadsheet-import-dialog";
 import { getGuildAccess } from "@/features/guilds/server";
 import { RosterCustomFieldManagerDialog } from "@/features/roster/roster-custom-field-manager-dialog";
 import { RosterTagManagerDialog } from "@/features/roster/roster-tag-manager-dialog";
@@ -91,6 +92,7 @@ export default async function GuildRosterPage({
               tags={roster.tags}
             />
             <AddCharacterDialog guildId={access.guildId} />
+            <GenericSpreadsheetImportDialog guildId={access.guildId} />
             <RtnwImportDialog guildId={access.guildId} />
           </div>
         </div>
@@ -101,9 +103,10 @@ export default async function GuildRosterPage({
               Your Master Roster is ready
             </p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-              Import the official RTNW Guild CSV for the current game
-              roster, or add a character manually. Future RTNW exports
-              will match manual entries by exact IGN.
+              Import a CSV/XLSX spreadsheet with explicit column mapping,
+              sync the official RTNW Guild CSV for the current game roster,
+              or add a character manually. Exact IGN remains the character
+              identity key.
             </p>
           </Surface>
         ) : (
