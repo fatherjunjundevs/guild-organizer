@@ -3,6 +3,12 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createManualCharacterAction } from "@/features/roster/manual-actions";
+import { PresetOrCustomField } from "@/features/roster/preset-or-custom-field";
+import {
+  GUILD_POSITION_OPTIONS,
+  ORGANIZER_ROLE_OPTIONS,
+  RTNW_CLASS_OPTIONS,
+} from "@/features/roster/roster-field-options";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 
@@ -13,6 +19,7 @@ export function AddCharacterDialog({
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropPointerStartedRef = useRef(false);
   const formRef = useRef<HTMLFormElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -64,12 +71,34 @@ export function AddCharacterDialog({
       <dialog
         ref={dialogRef}
         onClose={reset}
-        onClick={(event) => {
-          if (event.target === dialogRef.current) {
-            close();
-          }
+        onPointerDown={(event) => {
+          backdropPointerStartedRef.current =
+            event.target === dialogRef.current;
         }}
-        className="m-auto w-[min(46rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 backdrop:bg-black/70"
+        onPointerCancel={() => {
+          backdropPointerStartedRef.current = false;
+        }}
+        onClick={(event) => {
+          const shouldClose =
+            backdropPointerStartedRef.current &&
+            event.target === dialogRef.current;
+
+          backdropPointerStartedRef.current = false;
+
+          if (!shouldClose) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          window.requestAnimationFrame(() => {
+            if (dialogRef.current?.open) {
+              close();
+            }
+          });
+        }}
+        className="m-auto w-[min(46rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4 sm:px-6">
           <div>
@@ -116,47 +145,41 @@ export function AddCharacterDialog({
           </div>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">
-              Level
-              <input
+            <div className="text-sm font-semibold">
+                <label htmlFor="add-character-level">Level</label>
+                <input id="add-character-level"
                 name="level"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 placeholder="Optional"
               />
-            </label>
+              </div>
 
-            <label className="text-sm font-semibold">
-              Gear Score
-              <input
+            <div className="text-sm font-semibold">
+                <label htmlFor="add-character-gear-score">Gear Score</label>
+                <input id="add-character-gear-score"
                 name="gearScore"
                 inputMode="numeric"
                 pattern="[0-9]*"
                 className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 placeholder="Optional"
               />
-            </label>
+              </div>
 
-            <label className="text-sm font-semibold">
-              Class
-              <input
-                name="className"
-                maxLength={80}
-                className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                placeholder="e.g. High Priest"
-              />
-            </label>
+            <PresetOrCustomField
+              name="className"
+              label="Class"
+              options={RTNW_CLASS_OPTIONS}
+              placeholder="Enter class"
+            />
 
-            <label className="text-sm font-semibold">
-              Guild Position
-              <input
-                name="guildPosition"
-                maxLength={80}
-                className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                placeholder="e.g. Elite"
-              />
-            </label>
+            <PresetOrCustomField
+              name="guildPosition"
+              label="Guild Position"
+              options={GUILD_POSITION_OPTIONS}
+              placeholder="Enter Guild position"
+            />
           </div>
 
           <div className="mt-5 border-t border-[var(--border-subtle)] pt-5">
@@ -167,9 +190,9 @@ export function AddCharacterDialog({
             </p>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-semibold">
-                Designation
-                <select
+              <div className="text-sm font-semibold">
+                <label htmlFor="add-character-designation">Designation</label>
+                <select id="add-character-designation"
                   name="designation"
                   defaultValue=""
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
@@ -178,17 +201,15 @@ export function AddCharacterDialog({
                   <option value="main">Main</option>
                   <option value="sub">Sub</option>
                 </select>
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Organizer Role
-                <input
-                  name="roleLabel"
-                  maxLength={80}
-                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                  placeholder="e.g. Healer, Tank, Ranged DPS"
-                />
-              </label>
+              <PresetOrCustomField
+                name="roleLabel"
+                label="Organizer Role"
+                options={ORGANIZER_ROLE_OPTIONS}
+                emptyLabel="None"
+                placeholder="Enter organizer role"
+              />
             </div>
           </div>
 

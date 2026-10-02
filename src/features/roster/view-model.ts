@@ -11,7 +11,10 @@ export type RosterSort =
   | "gear-desc"
   | "ign-asc"
   | "level-desc"
-  | "contribution-desc";
+  | "weekly-contribution-desc"
+  | "weekly-contribution-asc"
+  | "total-contribution-desc"
+  | "total-contribution-asc";
 
 export type RosterViewOptions = {
   query: string;
@@ -48,6 +51,25 @@ function compareNullableNumbersDesc(
   }
 
   return right - left;
+}
+
+function compareNullableNumbersAsc(
+  left: number | null,
+  right: number | null,
+) {
+  if (left === null && right === null) {
+    return 0;
+  }
+
+  if (left === null) {
+    return 1;
+  }
+
+  if (right === null) {
+    return -1;
+  }
+
+  return left - right;
 }
 
 function getGuildPositionHierarchyRank(position: string | null) {
@@ -172,9 +194,36 @@ export function filterAndSortRoster(
         );
       }
 
-      if (options.sort === "contribution-desc") {
+      if (options.sort === "weekly-contribution-desc") {
         return (
           compareNullableNumbersDesc(
+            left.weeklyContribution,
+            right.weeklyContribution,
+          ) || left.ign.localeCompare(right.ign)
+        );
+      }
+
+      if (options.sort === "weekly-contribution-asc") {
+        return (
+          compareNullableNumbersAsc(
+            left.weeklyContribution,
+            right.weeklyContribution,
+          ) || left.ign.localeCompare(right.ign)
+        );
+      }
+
+      if (options.sort === "total-contribution-desc") {
+        return (
+          compareNullableNumbersDesc(
+            left.totalContribution,
+            right.totalContribution,
+          ) || left.ign.localeCompare(right.ign)
+        );
+      }
+
+      if (options.sort === "total-contribution-asc") {
+        return (
+          compareNullableNumbersAsc(
             left.totalContribution,
             right.totalContribution,
           ) || left.ign.localeCompare(right.ign)

@@ -162,6 +162,38 @@ describe("roster view model", () => {
     ).toEqual(["2", "3", "1", "4"]);
   });
 
+  it("sorts weekly contribution high and low with missing values last", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        sort: "weekly-contribution-desc",
+      }).map((row) => row.id),
+    ).toEqual(["1", "2", "3", "4"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        sort: "weekly-contribution-asc",
+      }).map((row) => row.id),
+    ).toEqual(["3", "2", "1", "4"]);
+  });
+
+  it("sorts total contribution high and low with missing values last", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        sort: "total-contribution-desc",
+      }).map((row) => row.id),
+    ).toEqual(["2", "1", "3", "4"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        sort: "total-contribution-asc",
+      }).map((row) => row.id),
+    ).toEqual(["3", "1", "2", "4"]);
+  });
+
   it("sorts Guild positions by hierarchy before Gear Score", () => {
     const hierarchyRows: MasterRosterCharacter[] = [
       {

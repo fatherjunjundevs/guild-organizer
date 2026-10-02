@@ -6,6 +6,14 @@ import {
   updateCharacterOrganizationAction,
   updateManualCharacterDetailsAction,
 } from "@/features/roster/manual-actions";
+import { PresetOrCustomField } from "@/features/roster/preset-or-custom-field";
+import {
+  GENDER_OPTIONS,
+  GUILD_POSITION_OPTIONS,
+  ONLINE_STATUS_OPTIONS,
+  ORGANIZER_ROLE_OPTIONS,
+  RTNW_CLASS_OPTIONS,
+} from "@/features/roster/roster-field-options";
 import type { MasterRosterCharacter } from "@/features/roster/server";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
@@ -25,6 +33,7 @@ export function CharacterOrganizerDialog({
 }) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const backdropPointerStartedRef = useRef(false);
   const [detailsBusy, setDetailsBusy] = useState(false);
   const [organizationBusy, setOrganizationBusy] = useState(false);
   const [detailsMessage, setDetailsMessage] = useState("");
@@ -98,12 +107,34 @@ export function CharacterOrganizerDialog({
         setOrganizationMessage("");
         onClose();
       }}
-      onClick={(event) => {
-        if (event.target === dialogRef.current) {
-          dialogRef.current?.close();
-        }
+      onPointerDown={(event) => {
+        backdropPointerStartedRef.current =
+          event.target === dialogRef.current;
       }}
-      className="m-auto w-[min(52rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 backdrop:bg-black/70"
+      onPointerCancel={() => {
+        backdropPointerStartedRef.current = false;
+      }}
+      onClick={(event) => {
+        const shouldClose =
+          backdropPointerStartedRef.current &&
+          event.target === dialogRef.current;
+
+        backdropPointerStartedRef.current = false;
+
+        if (!shouldClose) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        window.requestAnimationFrame(() => {
+          if (dialogRef.current?.open) {
+            dialogRef.current.close();
+          }
+        });
+      }}
+      className="m-auto w-[min(52rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
     >
       <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4 sm:px-6">
         <div className="min-w-0">
@@ -146,9 +177,9 @@ export function CharacterOrganizerDialog({
             </p>
 
             <div className="mt-4">
-              <label className="text-sm font-semibold">
-                IGN
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-ign">IGN</label>
+                <input id="edit-character-ign"
                   name="ign"
                   required
                   maxLength={80}
@@ -156,7 +187,7 @@ export function CharacterOrganizerDialog({
                   autoComplete="off"
                   className="mt-2 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
               <p className="mt-2 text-xs leading-5 text-[var(--text-tertiary)]">
                 IGN is the v1 roster identity key. Preserve exact case,
                 symbols, and Unicode. Renaming changes the exact IGN that
@@ -165,111 +196,106 @@ export function CharacterOrganizerDialog({
             </div>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <label className="text-sm font-semibold">
-                Level
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-level">Level</label>
+                <input id="edit-character-level"
                   name="level"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   defaultValue={fieldValue(character.level)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Class
-                <input
-                  name="className"
-                  maxLength={80}
-                  defaultValue={fieldValue(character.className)}
-                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                />
-              </label>
+              <PresetOrCustomField
+                name="className"
+                label="Class"
+                options={RTNW_CLASS_OPTIONS}
+                defaultValue={character.className}
+                placeholder="Enter class"
+              />
 
-              <label className="text-sm font-semibold">
-                Guild Position
-                <input
-                  name="guildPosition"
-                  maxLength={80}
-                  defaultValue={fieldValue(character.guildPosition)}
-                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                />
-              </label>
+              <PresetOrCustomField
+                name="guildPosition"
+                label="Guild Position"
+                options={GUILD_POSITION_OPTIONS}
+                defaultValue={character.guildPosition}
+                placeholder="Enter Guild position"
+              />
 
-              <label className="text-sm font-semibold">
-                Gear Score
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-gear-score">Gear Score</label>
+                <input id="edit-character-gear-score"
                   name="gearScore"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   defaultValue={fieldValue(character.gearScore)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Title
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-title">Title</label>
+                <input id="edit-character-title"
                   name="title"
                   maxLength={120}
                   defaultValue={fieldValue(character.title)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Gender
-                <input
-                  name="gender"
-                  maxLength={40}
-                  defaultValue={fieldValue(character.gender)}
-                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                />
-              </label>
+              <PresetOrCustomField
+                name="gender"
+                label="Gender"
+                options={GENDER_OPTIONS}
+                defaultValue={character.gender}
+                placeholder="Enter gender"
+                maxLength={40}
+              />
 
-              <label className="text-sm font-semibold">
-                Weekly Activity
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-weekly-activity">Weekly Activity</label>
+                <input id="edit-character-weekly-activity"
                   name="weeklyActivity"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   defaultValue={fieldValue(character.weeklyActivity)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Weekly Contribution
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-weekly-contribution">Weekly Contribution</label>
+                <input id="edit-character-weekly-contribution"
                   name="weeklyContribution"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   defaultValue={fieldValue(character.weeklyContribution)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold">
-                Total Contribution
-                <input
+              <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-total-contribution">Total Contribution</label>
+                <input id="edit-character-total-contribution"
                   name="totalContribution"
                   inputMode="numeric"
                   pattern="[0-9]*"
                   defaultValue={fieldValue(character.totalContribution)}
                   className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                 />
-              </label>
+              </div>
 
-              <label className="text-sm font-semibold sm:col-span-2 lg:col-span-3">
-                Online Status
-                <input
+              <div className="sm:col-span-2 lg:col-span-3">
+                <PresetOrCustomField
                   name="onlineStatus"
+                  label="Online Status"
+                  options={ONLINE_STATUS_OPTIONS}
+                  defaultValue={character.onlineStatus}
+                  placeholder="Enter online status"
                   maxLength={120}
-                  defaultValue={fieldValue(character.onlineStatus)}
-                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                  placeholder="Optional"
                 />
-              </label>
+              </div>
             </div>
 
             {detailsMessage ? (
@@ -312,9 +338,9 @@ export function CharacterOrganizerDialog({
           </p>
 
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <label className="text-sm font-semibold">
-              Designation
-              <select
+            <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-designation">Designation</label>
+                <select id="edit-character-designation"
                 name="designation"
                 defaultValue={character.designation ?? ""}
                 className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
@@ -323,24 +349,22 @@ export function CharacterOrganizerDialog({
                 <option value="main">Main</option>
                 <option value="sub">Sub</option>
               </select>
-            </label>
+              </div>
 
-            <label className="text-sm font-semibold">
-              Organizer Role
-              <input
-                name="roleLabel"
-                defaultValue={character.roleLabel ?? ""}
-                maxLength={80}
-                className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
-                placeholder="e.g. Healer, Tank, Ranged DPS"
-              />
-            </label>
+            <PresetOrCustomField
+              name="roleLabel"
+              label="Organizer Role"
+              options={ORGANIZER_ROLE_OPTIONS}
+              defaultValue={character.roleLabel}
+              emptyLabel="None"
+              placeholder="Enter organizer role"
+            />
           </div>
 
           <div className="mt-5">
-            <label className="text-sm font-semibold">
-              Roster Status
-              <select
+            <div className="text-sm font-semibold">
+                <label htmlFor="edit-character-status">Roster Status</label>
+                <select id="edit-character-status"
                 name="status"
                 defaultValue={
                   character.status === "active" ? "active" : "inactive"
@@ -350,7 +374,7 @@ export function CharacterOrganizerDialog({
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
-            </label>
+              </div>
 
             <p className="mt-2 text-xs leading-5 text-[var(--text-tertiary)]">
               Manual Inactive never deletes history. If this exact IGN

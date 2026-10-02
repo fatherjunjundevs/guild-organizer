@@ -121,24 +121,32 @@ export function RosterView({
 
       <Surface level={2} className="mt-6 p-4 sm:p-5">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_11rem_13rem_13rem]">
-          <label>
-            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+          <div>
+            <label
+              htmlFor="roster-search"
+              className="text-xs font-semibold text-[var(--text-tertiary)]"
+            >
               Search
-            </span>
+            </label>
             <input
+              id="roster-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="IGN, class, role…"
               className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
             />
-          </label>
+          </div>
 
-          <label>
-            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+          <div>
+            <label
+              htmlFor="roster-status"
+              className="text-xs font-semibold text-[var(--text-tertiary)]"
+            >
               Status
-            </span>
+            </label>
             <select
+              id="roster-status"
               value={status}
               onChange={(event) =>
                 setStatus(event.target.value as RosterStatusFilter)
@@ -150,13 +158,17 @@ export function RosterView({
               <option value="inactive">Inactive</option>
               <option value="all">All stored</option>
             </select>
-          </label>
+          </div>
 
-          <label>
-            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+          <div>
+            <label
+              htmlFor="roster-class"
+              className="text-xs font-semibold text-[var(--text-tertiary)]"
+            >
               Class
-            </span>
+            </label>
             <select
+              id="roster-class"
               value={className}
               onChange={(event) => setClassName(event.target.value)}
               className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
@@ -168,13 +180,17 @@ export function RosterView({
                 </option>
               ))}
             </select>
-          </label>
+          </div>
 
-          <label>
-            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+          <div>
+            <label
+              htmlFor="roster-sort"
+              className="text-xs font-semibold text-[var(--text-tertiary)]"
+            >
               Sort
-            </span>
+            </label>
             <select
+              id="roster-sort"
               value={sort}
               onChange={(event) =>
                 setSort(event.target.value as RosterSort)
@@ -187,11 +203,20 @@ export function RosterView({
               <option value="gear-desc">Gear Score · High</option>
               <option value="ign-asc">IGN · A–Z</option>
               <option value="level-desc">Level · High</option>
-              <option value="contribution-desc">
+              <option value="weekly-contribution-desc">
+                Weekly Contribution · High
+              </option>
+              <option value="weekly-contribution-asc">
+                Weekly Contribution · Low
+              </option>
+              <option value="total-contribution-desc">
                 Total Contribution · High
               </option>
+              <option value="total-contribution-asc">
+                Total Contribution · Low
+              </option>
             </select>
-          </label>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-4">
@@ -226,7 +251,7 @@ export function RosterView({
             className="mt-4 hidden overflow-hidden xl:block"
           >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1020px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1160px] border-collapse text-left text-sm">
                 <thead className="bg-[var(--surface-3)] text-xs font-semibold tracking-[0.06em] text-[var(--text-tertiary)] uppercase">
                   <tr>
                     <th className="px-4 py-3">Character</th>
@@ -235,6 +260,9 @@ export function RosterView({
                     <th className="px-4 py-3 text-right">Gear Score</th>
                     <th className="px-4 py-3 text-right">
                       Weekly Contribution
+                    </th>
+                    <th className="px-4 py-3 text-right">
+                      Total Contribution
                     </th>
                     <th className="px-4 py-3">Position</th>
                     <th className="px-4 py-3">Status</th>
@@ -273,6 +301,9 @@ export function RosterView({
                       </td>
                       <td className="px-4 py-3.5 text-right tabular-nums">
                         {formatNumber(character.weeklyContribution)}
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-semibold tabular-nums">
+                        {formatNumber(character.totalContribution)}
                       </td>
                       <td className="px-4 py-3.5 text-[var(--text-secondary)]">
                         {character.guildPosition ?? "—"}
@@ -329,10 +360,18 @@ export function RosterView({
                   </div>
                   <div>
                     <dt className="text-xs text-[var(--text-tertiary)]">
-                      Contribution
+                      Weekly Contribution
                     </dt>
                     <dd className="mt-1 font-semibold tabular-nums">
                       {formatNumber(character.weeklyContribution)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-[var(--text-tertiary)]">
+                      Total Contribution
+                    </dt>
+                    <dd className="mt-1 font-semibold tabular-nums">
+                      {formatNumber(character.totalContribution)}
                     </dd>
                   </div>
                   <div>
