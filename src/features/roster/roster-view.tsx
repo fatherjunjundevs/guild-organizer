@@ -113,7 +113,7 @@ export function RosterView({
       </div>
 
       <Surface level={2} className="mt-6 p-4 sm:p-5">
-        <div className="grid gap-3 lg:grid-cols-[minmax(14rem,1fr)_11rem_13rem_13rem]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_11rem_13rem_13rem]">
           <label>
             <span className="text-xs font-semibold text-[var(--text-tertiary)]">
               Search
@@ -215,7 +215,7 @@ export function RosterView({
         <>
           <Surface
             level={2}
-            className="mt-4 hidden overflow-hidden lg:block"
+            className="mt-4 hidden overflow-hidden xl:block"
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[940px] border-collapse text-left text-sm">
@@ -278,7 +278,7 @@ export function RosterView({
             </div>
           </Surface>
 
-          <div className="mt-4 space-y-3 lg:hidden">
+          <div className="mt-4 space-y-3 xl:hidden">
             {visibleCharacters.map((character) => (
               <Surface key={character.id} level={2} className="p-4">
                 <div className="flex items-start justify-between gap-3">

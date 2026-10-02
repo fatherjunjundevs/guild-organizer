@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getGuildAccess } from "@/features/guilds/server";
+import { RtnwImportDialog } from "@/features/roster/rtnw-import-dialog";
 import { RosterView } from "@/features/roster/roster-view";
 import { loadMasterRoster } from "@/features/roster/server";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,7 @@ export default async function GuildRosterPage({
             <Button variant="secondary" disabled>
               Add Character
             </Button>
-            <Button disabled>Import RTNW CSV</Button>
+            <RtnwImportDialog guildId={access.guildId} />
           </div>
         </div>
 
@@ -92,10 +93,10 @@ export default async function GuildRosterPage({
               Your Master Roster is ready for its first import
             </p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-              The database and exact-IGN synchronization engine are
-              already in place. The next checkpoint will connect the
-              official RTNW Guild CSV upload and preview workflow to this
-              screen.
+              Import the official RTNW Guild CSV to create the current
+              roster. Future exports will preview updates, returning
+              characters, and members who have left before anything is
+              applied.
             </p>
           </Surface>
         ) : (
