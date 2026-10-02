@@ -36,6 +36,43 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"character_roster_custom_field_values": {
+                  Row: {
+                    "character_id": string,"created_at": string,"created_by": string | null,"field_id": string,"guild_id": string,"updated_at": string,"updated_by": string | null,"value": NonNullable<Json>
+                  }
+                  Insert: {
+                    "character_id": string,"created_at"?: string,"created_by"?: string | null,"field_id": string,"guild_id": string,"updated_at"?: string,"updated_by"?: string | null,"value": NonNullable<Json>
+                  }
+                  Update: {
+                    "character_id"?: string,"created_at"?: string,"created_by"?: string | null,"field_id"?: string,"guild_id"?: string,"updated_at"?: string,"updated_by"?: string | null,"value"?: NonNullable<Json>
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "character_roster_custom_field_values_character_fk"
+      columns: ["guild_id","character_id"]
+isOneToOne: false
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_roster_custom_field_values_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "character_roster_custom_field_values_field_fk"
+      columns: ["guild_id","field_id"]
+isOneToOne: false
+      referencedRelation: "roster_custom_fields"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_roster_custom_field_values_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"character_roster_profiles": {
                   Row: {
                     "character_id": string,"created_at": string,"created_by": string | null,"designation": string | null,"guild_id": string,"role_label": string | null,"updated_at": string
@@ -267,6 +304,31 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"roster_custom_fields": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"field_type": string,"guild_id": string,"id": string,"name": string,"select_options": (string)[],"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"field_type": string,"guild_id": string,"id"?: string,"name": string,"select_options"?: (string)[],"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"field_type"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"select_options"?: (string)[],"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "roster_custom_fields_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "roster_custom_fields_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"roster_sync_runs": {
                   Row: {
                     "applied_at": string,"created_at": string,"created_count": number,"guild_id": string,"id": string,"imported_by": string | null,"left_guild_count": number,"reactivated_count": number,"source_filename": string,"source_row_count": number,"source_sha256": string,"source_type": string,"unchanged_count": number,"updated_count": number
@@ -343,8 +405,14 @@ isOneToOne: false
 "create_roster_character":
 { Args: { "p_class_name"?: string,"p_designation"?: string,"p_gear_score"?: number,"p_gender"?: string,"p_guild_id": string,"p_guild_position"?: string,"p_ign": string,"p_level"?: number,"p_online_status"?: string,"p_role_label"?: string,"p_title"?: string,"p_total_contribution"?: number,"p_weekly_activity"?: number,"p_weekly_contribution"?: number }; Returns: string
                            },
+"create_roster_custom_field":
+{ Args: { "p_field_type": string,"p_guild_id": string,"p_name": string,"p_select_options"?: (string)[] }; Returns: string
+                           },
 "create_roster_tag":
 { Args: { "p_guild_id": string,"p_name": string }; Returns: string
+                           },
+"delete_roster_custom_field":
+{ Args: { "p_field_id": string }; Returns: undefined
                            },
 "delete_roster_tag":
 { Args: { "p_tag_id": string }; Returns: undefined
@@ -382,6 +450,9 @@ isOneToOne: false
 "set_character_manual_status":
 { Args: { "p_character_id": string,"p_status": string }; Returns: undefined
                            },
+"set_character_roster_custom_fields":
+{ Args: { "p_character_id": string,"p_values": Json }; Returns: number
+                           },
 "set_character_roster_profile":
 { Args: { "p_character_id": string,"p_designation": string,"p_role_label": string }; Returns: undefined
                            },
@@ -399,6 +470,9 @@ isOneToOne: false
                            },
 "update_roster_character":
 { Args: { "p_character_id": string,"p_class_name": string,"p_gear_score": number,"p_gender": string,"p_guild_position": string,"p_ign": string,"p_level": number,"p_online_status": string,"p_title": string,"p_total_contribution": number,"p_weekly_activity": number,"p_weekly_contribution": number }; Returns: undefined
+                           },
+"update_roster_custom_field":
+{ Args: { "p_field_id": string,"p_name": string,"p_select_options"?: (string)[] }; Returns: undefined
                            }
           }
           Enums: {
