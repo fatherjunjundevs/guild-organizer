@@ -526,6 +526,9 @@ isOneToOne: false
               "change_kind": string,"character_id": string,"ign": string
             }[]
                            },
+"reconcile_roster_character":
+{ Args: { "p_note"?: string,"p_source_character_id": string,"p_target_character_id": string,"p_triggering_sync_run_id"?: string }; Returns: string
+                           },
 "regenerate_guild_invite":
 { Args: { "p_expires_at": string,"p_invite_id": string,"p_token_digest": string }; Returns: number
                            },
