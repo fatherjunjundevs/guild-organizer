@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { CharacterOrganizerDialog } from "@/features/roster/character-organizer-dialog";
 import type { MasterRosterCharacter } from "@/features/roster/server";
 import {
   filterAndSortRoster,
@@ -9,6 +10,7 @@ import {
   type RosterSort,
   type RosterStatusFilter,
 } from "@/features/roster/view-model";
+import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
@@ -33,8 +35,10 @@ function CharacterStatus({
 }
 
 export function RosterView({
+  guildId,
   characters,
 }: {
+  guildId: string;
   characters: MasterRosterCharacter[];
 }) {
   const [query, setQuery] = useState("");
@@ -43,6 +47,8 @@ export function RosterView({
   const [className, setClassName] = useState("all");
   const [sort, setSort] =
     useState<RosterSort>("position-hierarchy");
+  const [selectedCharacter, setSelectedCharacter] =
+    useState<MasterRosterCharacter | null>(null);
 
   const summary = useMemo(
     () => getRosterSummary(characters),
@@ -176,7 +182,7 @@ export function RosterView({
               className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
             >
               <option value="position-hierarchy">
-                Guild Position · Hierarchy
+                Guild Hierarchy
               </option>
               <option value="gear-desc">Gear Score · High</option>
               <option value="ign-asc">IGN · A–Z</option>
@@ -210,9 +216,7 @@ export function RosterView({
         <Surface level={2} className="mt-4 p-8 text-center">
           <p className="font-semibold">No roster characters match</p>
           <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Adjust the search or filters. If this Guild has not been
-            imported yet, the RTNW CSV import flow is the next roster
-            checkpoint.
+            Adjust the search or filters.
           </p>
         </Surface>
       ) : (
@@ -222,7 +226,7 @@ export function RosterView({
             className="mt-4 hidden overflow-hidden xl:block"
           >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[940px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1020px] border-collapse text-left text-sm">
                 <thead className="bg-[var(--surface-3)] text-xs font-semibold tracking-[0.06em] text-[var(--text-tertiary)] uppercase">
                   <tr>
                     <th className="px-4 py-3">Character</th>
@@ -234,6 +238,7 @@ export function RosterView({
                     </th>
                     <th className="px-4 py-3">Position</th>
                     <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3 text-right">Manage</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -274,6 +279,18 @@ export function RosterView({
                       </td>
                       <td className="px-4 py-3.5">
                         <CharacterStatus character={character} />
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            setSelectedCharacter(character)
+                          }
+                        >
+                          Edit
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -335,11 +352,28 @@ export function RosterView({
                     </dd>
                   </div>
                 </dl>
+
+                <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setSelectedCharacter(character)}
+                  >
+                    Edit Character
+                  </Button>
+                </div>
               </Surface>
             ))}
           </div>
         </>
       )}
+
+      <CharacterOrganizerDialog
+        guildId={guildId}
+        character={selectedCharacter}
+        onClose={() => setSelectedCharacter(null)}
+      />
     </>
   );
 }

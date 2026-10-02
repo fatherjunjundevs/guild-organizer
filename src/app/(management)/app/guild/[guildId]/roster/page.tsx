@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
+import { AddCharacterDialog } from "@/features/roster/add-character-dialog";
 import { getGuildAccess } from "@/features/guilds/server";
 import { RtnwImportDialog } from "@/features/roster/rtnw-import-dialog";
 import { RosterView } from "@/features/roster/roster-view";
 import { loadMasterRoster } from "@/features/roster/server";
-import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
@@ -80,9 +80,7 @@ export default async function GuildRosterPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled>
-              Add Character
-            </Button>
+            <AddCharacterDialog guildId={access.guildId} />
             <RtnwImportDialog guildId={access.guildId} />
           </div>
         </div>
@@ -90,17 +88,19 @@ export default async function GuildRosterPage({
         {roster.characters.length === 0 ? (
           <Surface level={2} className="mt-8 p-8">
             <p className="text-lg font-semibold">
-              Your Master Roster is ready for its first import
+              Your Master Roster is ready
             </p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-              Import the official RTNW Guild CSV to create the current
-              roster. Future exports will preview updates, returning
-              characters, and members who have left before anything is
-              applied.
+              Import the official RTNW Guild CSV for the current game
+              roster, or add a character manually. Future RTNW exports
+              will match manual entries by exact IGN.
             </p>
           </Surface>
         ) : (
-          <RosterView characters={roster.characters} />
+          <RosterView
+            guildId={access.guildId}
+            characters={roster.characters}
+          />
         )}
       </div>
     </div>
