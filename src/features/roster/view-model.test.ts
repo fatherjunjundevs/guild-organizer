@@ -1,10 +1,40 @@
 import { describe, expect, it } from "vitest";
-import type { MasterRosterCharacter } from "@/features/roster/server";
+import type {
+  MasterRosterCharacter,
+  MasterRosterCustomField,
+} from "@/features/roster/server";
 import {
   filterAndSortRoster,
   getRosterClassOptions,
   getRosterSummary,
 } from "@/features/roster/view-model";
+
+const customFields: MasterRosterCustomField[] = [
+  {
+    id: "field-discord",
+    name: "Discord Name",
+    fieldType: "text",
+    selectOptions: [],
+  },
+  {
+    id: "field-team",
+    name: "Event Team",
+    fieldType: "select",
+    selectOptions: ["Main Team", "Reserve"],
+  },
+  {
+    id: "field-available",
+    name: "Available",
+    fieldType: "boolean",
+    selectOptions: [],
+  },
+  {
+    id: "field-priority",
+    name: "Priority",
+    fieldType: "number",
+    selectOptions: [],
+  },
+];
 
 const rows: MasterRosterCharacter[] = [
   {
@@ -30,6 +60,12 @@ const rows: MasterRosterCharacter[] = [
       { id: "tag-raid", name: "Raid Team" },
       { id: "tag-siege", name: "Siege" },
     ],
+    customFieldValues: {
+      "field-discord": "jmc-priest#777",
+      "field-team": "Main Team",
+      "field-available": true,
+      "field-priority": 7.5,
+    },
   },
   {
     id: "2",
@@ -51,6 +87,11 @@ const rows: MasterRosterCharacter[] = [
     designation: null,
     roleLabel: "Ranged DPS",
     tags: [{ id: "tag-siege", name: "Siege" }],
+    customFieldValues: {
+      "field-team": "Reserve",
+      "field-available": false,
+      "field-priority": 2,
+    },
   },
   {
     id: "3",
@@ -72,6 +113,7 @@ const rows: MasterRosterCharacter[] = [
     designation: null,
     roleLabel: "Tank",
     tags: [],
+    customFieldValues: {},
   },
   {
     id: "4",
@@ -93,6 +135,9 @@ const rows: MasterRosterCharacter[] = [
     designation: "sub",
     roleLabel: "Support",
     tags: [{ id: "tag-reserve", name: "Reserve" }],
+    customFieldValues: {
+      "field-discord": "crafter-alt#55",
+    },
   },
 ];
 
@@ -101,6 +146,9 @@ const baseOptions = {
   status: "all" as const,
   className: "all",
   tagId: "all",
+  customFields,
+  customFieldId: "all",
+  customFieldValue: "",
   sort: "gear-desc" as const,
 };
 
@@ -134,7 +182,74 @@ describe("roster view model", () => {
         ...baseOptions,
         query: "reserve",
       }).map((row) => row.id),
-    ).toEqual(["4"]);
+    ).toEqual(["2", "4"]);
+  });
+
+  it("searches custom field names and values", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        query: "jmc-priest",
+      }).map((row) => row.id),
+    ).toEqual(["1"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        query: "event team",
+      }).map((row) => row.id),
+    ).toEqual(["2", "1"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        query: "yes",
+      }).map((row) => row.id),
+    ).toEqual(["1"]);
+  });
+
+  it("filters characters that have any value for a custom field", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        customFieldId: "field-discord",
+        customFieldValue: "",
+      }).map((row) => row.id),
+    ).toEqual(["1", "4"]);
+  });
+
+  it("filters typed custom field values", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        customFieldId: "field-discord",
+        customFieldValue: "priest",
+      }).map((row) => row.id),
+    ).toEqual(["1"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        customFieldId: "field-team",
+        customFieldValue: "Reserve",
+      }).map((row) => row.id),
+    ).toEqual(["2"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        customFieldId: "field-available",
+        customFieldValue: "false",
+      }).map((row) => row.id),
+    ).toEqual(["2"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        customFieldId: "field-priority",
+        customFieldValue: "7.5",
+      }).map((row) => row.id),
+    ).toEqual(["1"]);
   });
 
   it("filters by organizer tag", () => {

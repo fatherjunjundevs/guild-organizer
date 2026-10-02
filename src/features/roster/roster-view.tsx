@@ -11,6 +11,7 @@ import type {
 } from "@/features/roster/server";
 import {
   filterAndSortRoster,
+  formatRosterCustomFieldValue,
   getRosterClassOptions,
   getRosterSummary,
   type RosterSort,
@@ -22,6 +23,46 @@ import { Surface } from "@/components/ui/surface";
 
 function formatNumber(value: number | null) {
   return value === null ? "—" : new Intl.NumberFormat().format(value);
+}
+
+function CharacterCustomFieldPreview({
+  character,
+  customFields,
+}: {
+  character: MasterRosterCharacter;
+  customFields: MasterRosterCustomField[];
+}) {
+  const populatedFields = customFields.flatMap((field) => {
+    const value = character.customFieldValues?.[field.id];
+
+    return value === undefined ? [] : [{ field, value }];
+  });
+
+  if (populatedFields.length === 0) {
+    return null;
+  }
+
+  const preview = populatedFields.slice(0, 2);
+  const remaining = populatedFields.length - preview.length;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {preview.map(({ field, value }) => (
+        <span
+          key={field.id}
+          title={`${field.name}: ${formatRosterCustomFieldValue(value)}`}
+          className="max-w-56 truncate rounded-full border border-[var(--accent-border)] bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]"
+        >
+          {field.name}: {formatRosterCustomFieldValue(value)}
+        </span>
+      ))}
+      {remaining > 0 ? (
+        <span className="rounded-full border border-[var(--border-default)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-tertiary)]">
+          +{remaining}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 function CharacterStatus({
@@ -56,6 +97,8 @@ export function RosterView({
     useState<RosterStatusFilter>("active");
   const [className, setClassName] = useState("all");
   const [tagId, setTagId] = useState("all");
+  const [customFieldId, setCustomFieldId] = useState("all");
+  const [customFieldValue, setCustomFieldValue] = useState("");
   const [sort, setSort] =
     useState<RosterSort>("position-hierarchy");
   const [selectedCharacter, setSelectedCharacter] =
@@ -74,6 +117,30 @@ export function RosterView({
     () => getRosterClassOptions(characters),
     [characters],
   );
+  const selectedCustomField = useMemo(
+    () =>
+      customFields.find((field) => field.id === customFieldId) ?? null,
+    [customFieldId, customFields],
+  );
+  const effectiveCustomFieldId = selectedCustomField
+    ? customFieldId
+    : "all";
+  const effectiveCustomFieldValue = useMemo(() => {
+    if (!selectedCustomField) {
+      return "";
+    }
+
+    if (
+      selectedCustomField.fieldType === "select" &&
+      customFieldValue &&
+      !selectedCustomField.selectOptions.includes(customFieldValue)
+    ) {
+      return "";
+    }
+
+    return customFieldValue;
+  }, [customFieldValue, selectedCustomField]);
+
   const visibleCharacters = useMemo(
     () =>
       filterAndSortRoster(characters, {
@@ -81,9 +148,22 @@ export function RosterView({
         status,
         className,
         tagId,
+        customFields,
+        customFieldId: effectiveCustomFieldId,
+        customFieldValue: effectiveCustomFieldValue,
         sort,
       }),
-    [characters, query, status, className, tagId, sort],
+    [
+      characters,
+      query,
+      status,
+      className,
+      tagId,
+      customFields,
+      effectiveCustomFieldId,
+      effectiveCustomFieldValue,
+      sort,
+    ],
   );
   const selectedCharacters = useMemo(
     () =>
@@ -198,7 +278,7 @@ export function RosterView({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="IGN, class, role…"
+              placeholder="IGN, class, role, custom fields…"
               className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
             />
           </div>
@@ -305,6 +385,101 @@ export function RosterView({
             </select>
           </div>
         </div>
+
+        {customFields.length > 0 ? (
+          <div className="mt-4 grid gap-3 border-t border-[var(--border-subtle)] pt-4 md:grid-cols-2 xl:max-w-2xl">
+            <div>
+              <label
+                htmlFor="roster-custom-field"
+                className="text-xs font-semibold text-[var(--text-tertiary)]"
+              >
+                Custom field
+              </label>
+              <select
+                id="roster-custom-field"
+                value={effectiveCustomFieldId}
+                onChange={(event) => {
+                  setCustomFieldId(event.target.value);
+                  setCustomFieldValue("");
+                }}
+                className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
+              >
+                <option value="all">All custom fields</option>
+                {customFields.map((field) => (
+                  <option key={field.id} value={field.id}>
+                    {field.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedCustomField ? (
+              <div>
+                <label
+                  htmlFor="roster-custom-field-value"
+                  className="text-xs font-semibold text-[var(--text-tertiary)]"
+                >
+                  Custom value
+                </label>
+
+                {selectedCustomField.fieldType === "boolean" ? (
+                  <select
+                    id="roster-custom-field-value"
+                    value={effectiveCustomFieldValue}
+                    onChange={(event) =>
+                      setCustomFieldValue(event.target.value)
+                    }
+                    className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="">Any set value</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                ) : selectedCustomField.fieldType === "select" ? (
+                  <select
+                    id="roster-custom-field-value"
+                    value={effectiveCustomFieldValue}
+                    onChange={(event) =>
+                      setCustomFieldValue(event.target.value)
+                    }
+                    className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="">Any set value</option>
+                    {selectedCustomField.selectOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id="roster-custom-field-value"
+                    type={
+                      selectedCustomField.fieldType === "number"
+                        ? "number"
+                        : "search"
+                    }
+                    step={
+                      selectedCustomField.fieldType === "number"
+                        ? "any"
+                        : undefined
+                    }
+                    value={effectiveCustomFieldValue}
+                    onChange={(event) =>
+                      setCustomFieldValue(event.target.value)
+                    }
+                    placeholder={
+                      selectedCustomField.fieldType === "number"
+                        ? "Exact number · blank = any"
+                        : "Contains text · blank = any"
+                    }
+                    className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-disabled)]"
+                  />
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
           <p className="text-sm text-[var(--text-secondary)]">
@@ -453,6 +628,10 @@ export function RosterView({
                             ))}
                           </div>
                         ) : null}
+                        <CharacterCustomFieldPreview
+                          character={character}
+                          customFields={customFields}
+                        />
                       </td>
                       <td className="px-4 py-3.5 text-[var(--text-secondary)]">
                         {character.className ?? "—"}
@@ -530,6 +709,10 @@ export function RosterView({
                         ))}
                       </div>
                     ) : null}
+                    <CharacterCustomFieldPreview
+                      character={character}
+                      customFields={customFields}
+                    />
                   </div>
 
                   <div className="flex shrink-0 items-center gap-3">

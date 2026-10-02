@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(38);
+select plan(39);
 
 -- ---------------------------------------------------------------------------
 -- Schema / function surface
@@ -267,6 +267,40 @@ values (
   '93000000-0000-0000-0000-000000000002',
   'main',
   'Ranged DPS',
+  '90000000-0000-0000-0000-000000000001'
+);
+
+insert into public.roster_custom_fields (
+  id,
+  guild_id,
+  name,
+  field_type,
+  select_options,
+  created_by
+)
+values (
+  '95000000-0000-4000-8000-000000000001',
+  '91000000-0000-0000-0000-000000000001',
+  'Event Team',
+  'select',
+  array['Main Team', 'Reserve'],
+  '90000000-0000-0000-0000-000000000001'
+);
+
+insert into public.character_roster_custom_field_values (
+  guild_id,
+  character_id,
+  field_id,
+  value,
+  created_by,
+  updated_by
+)
+values (
+  '91000000-0000-0000-0000-000000000001',
+  '93000000-0000-0000-0000-000000000002',
+  '95000000-0000-4000-8000-000000000001',
+  to_jsonb('Main Team'::text),
+  '90000000-0000-0000-0000-000000000001',
   '90000000-0000-0000-0000-000000000001'
 );
 
@@ -679,6 +713,18 @@ select is(
   ),
   'main|Ranged DPS'::text,
   'RTNW sync preserves organizer-maintained roster metadata'
+);
+
+select is(
+  (
+    select value #>> '{}'
+    from public.character_roster_custom_field_values
+    where guild_id = '91000000-0000-0000-0000-000000000001'
+      and character_id = '93000000-0000-0000-0000-000000000002'
+      and field_id = '95000000-0000-4000-8000-000000000001'
+  ),
+  'Main Team'::text,
+  'RTNW sync preserves organizer custom field values'
 );
 
 select is(

@@ -2,7 +2,7 @@ begin;
 
 create extension if not exists pgtap with schema extensions;
 
-select plan(34);
+select plan(36);
 
 select ok(
   to_regprocedure('public.create_roster_custom_field(uuid,text,text,text[])') is not null,
@@ -329,6 +329,36 @@ select is(
   ),
   'FatherJunJun#1'::text,
   'text custom field value is preserved'
+);
+
+select lives_ok(
+  $test$
+    select public.update_roster_custom_field(
+      (
+        select id
+        from public.roster_custom_fields
+        where guild_id = 'b4000000-0000-4000-8000-000000000001'
+          and name = 'Discord Name'
+      ),
+      'Discord Handle',
+      '{}'::text[]
+    )
+  $test$,
+  'Owner can rename a populated custom field'
+);
+
+select is(
+  (
+    select value #>> '{}'
+    from public.character_roster_custom_field_values v
+    join public.roster_custom_fields f
+      on f.guild_id = v.guild_id
+     and f.id = v.field_id
+    where v.character_id = 'b6000000-0000-4000-8000-000000000001'
+      and f.name = 'Discord Handle'
+  ),
+  'FatherJunJun#1'::text,
+  'renaming a populated custom field preserves its character value'
 );
 
 select is(

@@ -1,4 +1,7 @@
-import type { MasterRosterCharacter } from "@/features/roster/server";
+import type {
+  MasterRosterCharacter,
+  MasterRosterCustomField,
+} from "@/features/roster/server";
 
 export type RosterStatusFilter =
   | "active"
@@ -21,6 +24,9 @@ export type RosterViewOptions = {
   status: RosterStatusFilter;
   className: string;
   tagId?: string;
+  customFields?: MasterRosterCustomField[];
+  customFieldId?: string;
+  customFieldValue?: string;
   sort: RosterSort;
 };
 
@@ -62,6 +68,41 @@ function getGuildPositionHierarchyRank(position: string | null) {
     GUILD_POSITION_HIERARCHY[position.trim().toLocaleLowerCase()] ??
     Number.MAX_SAFE_INTEGER
   );
+}
+
+export function formatRosterCustomFieldValue(
+  value: string | number | boolean,
+) {
+  if (typeof value === "boolean") {
+    return value ? "Yes" : "No";
+  }
+
+  return String(value);
+}
+
+function getCustomFieldSearchTokens(
+  character: MasterRosterCharacter,
+  fields: MasterRosterCustomField[],
+) {
+  const values = character.customFieldValues ?? {};
+  const fieldsById = new Map(fields.map((field) => [field.id, field]));
+  const tokens: string[] = [];
+
+  for (const [fieldId, value] of Object.entries(values)) {
+    const field = fieldsById.get(fieldId);
+
+    if (field) {
+      tokens.push(field.name);
+    }
+
+    tokens.push(String(value));
+
+    if (typeof value === "boolean") {
+      tokens.push(formatRosterCustomFieldValue(value));
+    }
+  }
+
+  return tokens;
 }
 
 export function getRosterSummary(
@@ -145,6 +186,36 @@ export function filterAndSortRoster(
         return false;
       }
 
+      if (
+        options.customFieldId &&
+        options.customFieldId !== "all"
+      ) {
+        const value =
+          character.customFieldValues?.[options.customFieldId];
+
+        if (value === undefined) {
+          return false;
+        }
+
+        const filterValue = options.customFieldValue?.trim() ?? "";
+
+        if (filterValue) {
+          const field = options.customFields?.find(
+            (candidate) => candidate.id === options.customFieldId,
+          );
+          const normalizedValue = String(value).toLocaleLowerCase();
+          const normalizedFilter = filterValue.toLocaleLowerCase();
+
+          if (field?.fieldType === "text") {
+            if (!normalizedValue.includes(normalizedFilter)) {
+              return false;
+            }
+          } else if (normalizedValue !== normalizedFilter) {
+            return false;
+          }
+        }
+      }
+
       if (!query) return true;
 
       const searchable = [
@@ -154,6 +225,10 @@ export function filterAndSortRoster(
         character.guildPosition,
         character.roleLabel,
         ...character.tags.map((tag) => tag.name),
+        ...getCustomFieldSearchTokens(
+          character,
+          options.customFields ?? [],
+        ),
       ]
         .filter(Boolean)
         .join(" ")

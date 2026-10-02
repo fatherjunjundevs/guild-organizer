@@ -5,7 +5,8 @@ An unofficial community tool for organizing guild rosters, events, assignments, 
 ## Current Development Status
 
 **Official roadmap:** Phase 3 — Master Guild Roster  
-**Current internal checkpoint:** Phase 3.4A — Roster Tags ✅ complete
+
+**Next checkpoint:** Phase 3.5 — Generic Spreadsheet Import & Mapping ⏳
 
 Implemented so far includes:
 
@@ -25,6 +26,7 @@ Implemented so far includes:
 - Organizer designation and role metadata
 - Bulk roster management
 - Guild-specific reusable roster tags
+- Guild-defined custom organizer fields with typed values, roster search/filter integration, and RTNW-safe persistence
 - Vitest + Testing Library
 - Playwright end-to-end testing
 - GitHub Actions CI

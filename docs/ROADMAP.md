@@ -34,11 +34,9 @@ Completed internal checkpoints:
 - **3.3B** Manual Full Detail Editing & RTNW Protection ✅
 - **3.3C** Bulk Roster Management ✅
 - **3.4A** Roster Tags ✅
+- **3.4B** Custom Organizer Fields ✅
 
 Remaining Phase 3 work:
-
-### 3.4B — Custom Organizer Fields ⏳
-Guild-defined organizer fields, character values, safe field types, permissions, search/filter use where valuable, and persistence across RTNW imports.
 
 ### 3.5 — Generic Spreadsheet Import & Mapping ⏳
 Excel/CSV ingestion, column mapping, auto-detection suggestions, duplicate detection, validation summary, preview, and transactional apply. This remains separate from the strict official RTNW importer.
