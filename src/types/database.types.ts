@@ -388,6 +388,11 @@ isOneToOne: false
             "accept_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: string
                            },
+"apply_generic_roster_import":
+{ Args: { "p_guild_id": string,"p_mapped_fields": (string)[],"p_rows": Json,"p_source_filename": string,"p_source_sha256": string }; Returns: {
+              "created_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
+            }[]
+                           },
 "apply_rtnw_roster_sync":
 { Args: { "p_guild_id": string,"p_rows": Json,"p_source_filename": string,"p_source_sha256": string }; Returns: {
               "created_count": number,"left_guild_count": number,"reactivated_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
@@ -423,6 +428,11 @@ isOneToOne: false
 "list_manageable_guild_invites":
 { Args: { "p_guild_id": string }; Returns: {
               "created_at": string,"expires_at": string,"generation": number,"invite_id": string,"invite_kind": string,"invite_role": string,"max_uses": number,"status": string,"updated_at": string,"use_count": number
+            }[]
+                           },
+"preview_generic_roster_import":
+{ Args: { "p_guild_id": string,"p_mapped_fields": (string)[],"p_rows": Json }; Returns: {
+              "change_kind": string,"changed_fields": (string)[],"character_id": string,"ign": string
             }[]
                            },
 "preview_rtnw_roster_sync":
