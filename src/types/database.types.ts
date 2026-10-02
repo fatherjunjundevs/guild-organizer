@@ -36,6 +36,49 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"character_reconciliations": {
+                  Row: {
+                    "guild_id": string,"id": string,"note": string | null,"reconciled_at": string,"reconciled_by": string | null,"source_character_id": string,"source_ign_snapshot": string,"target_character_id": string,"target_ign_snapshot": string,"triggering_sync_run_id": string | null
+                  }
+                  Insert: {
+                    "guild_id": string,"id"?: string,"note"?: string | null,"reconciled_at"?: string,"reconciled_by"?: string | null,"source_character_id": string,"source_ign_snapshot": string,"target_character_id": string,"target_ign_snapshot": string,"triggering_sync_run_id"?: string | null
+                  }
+                  Update: {
+                    "guild_id"?: string,"id"?: string,"note"?: string | null,"reconciled_at"?: string,"reconciled_by"?: string | null,"source_character_id"?: string,"source_ign_snapshot"?: string,"target_character_id"?: string,"target_ign_snapshot"?: string,"triggering_sync_run_id"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "character_reconciliations_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "character_reconciliations_reconciled_by_fkey"
+      columns: ["reconciled_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "character_reconciliations_source_fk"
+      columns: ["guild_id","source_character_id"]
+isOneToOne: true
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_reconciliations_target_fk"
+      columns: ["guild_id","target_character_id"]
+isOneToOne: false
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_reconciliations_triggering_run_fk"
+      columns: ["guild_id","triggering_sync_run_id"]
+isOneToOne: false
+      referencedRelation: "roster_sync_runs"
+      referencedColumns: ["guild_id","id"]
+    }
+                  ]
                 },"character_roster_custom_field_values": {
                   Row: {
                     "character_id": string,"created_at": string,"created_by": string | null,"field_id": string,"guild_id": string,"updated_at": string,"updated_by": string | null,"value": NonNullable<Json>
@@ -131,13 +174,13 @@ isOneToOne: false
                   ]
                 },"characters": {
                   Row: {
-                    "class_name": string | null,"created_at": string,"created_by": string | null,"gear_score": number | null,"gender": string | null,"guild_id": string,"guild_position": string | null,"id": string,"ign": string,"inactive_reason": string | null,"left_guild_at": string | null,"level": number | null,"online_status": string | null,"rtnw_first_seen_at": string | null,"rtnw_last_seen_at": string | null,"source_origin": string,"status": string,"title": string | null,"total_contribution": number | null,"updated_at": string,"weekly_activity": number | null,"weekly_contribution": number | null
+                    "class_name": string | null,"created_at": string,"created_by": string | null,"gear_score": number | null,"gender": string | null,"guild_id": string,"guild_position": string | null,"id": string,"ign": string,"inactive_reason": string | null,"left_guild_at": string | null,"level": number | null,"online_status": string | null,"reconciled_at": string | null,"reconciled_by": string | null,"reconciled_into_character_id": string | null,"rtnw_first_seen_at": string | null,"rtnw_last_seen_at": string | null,"source_origin": string,"status": string,"title": string | null,"total_contribution": number | null,"updated_at": string,"weekly_activity": number | null,"weekly_contribution": number | null
                   }
                   Insert: {
-                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id": string,"guild_position"?: string | null,"id"?: string,"ign": string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
+                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id": string,"guild_position"?: string | null,"id"?: string,"ign": string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"reconciled_at"?: string | null,"reconciled_by"?: string | null,"reconciled_into_character_id"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
                   }
                   Update: {
-                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id"?: string,"guild_position"?: string | null,"id"?: string,"ign"?: string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
+                    "class_name"?: string | null,"created_at"?: string,"created_by"?: string | null,"gear_score"?: number | null,"gender"?: string | null,"guild_id"?: string,"guild_position"?: string | null,"id"?: string,"ign"?: string,"inactive_reason"?: string | null,"left_guild_at"?: string | null,"level"?: number | null,"online_status"?: string | null,"reconciled_at"?: string | null,"reconciled_by"?: string | null,"reconciled_into_character_id"?: string | null,"rtnw_first_seen_at"?: string | null,"rtnw_last_seen_at"?: string | null,"source_origin"?: string,"status"?: string,"title"?: string | null,"total_contribution"?: number | null,"updated_at"?: string,"weekly_activity"?: number | null,"weekly_contribution"?: number | null
                   }
                   Relationships: [
                     {
@@ -152,6 +195,18 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "guilds"
       referencedColumns: ["id"]
+    },{
+      foreignKeyName: "characters_reconciled_by_fkey"
+      columns: ["reconciled_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "characters_reconciled_target_fk"
+      columns: ["guild_id","reconciled_into_character_id"]
+isOneToOne: false
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
     }
                   ]
                 },"guild_invite_acceptances": {
@@ -327,6 +382,37 @@ isOneToOne: false
 isOneToOne: false
       referencedRelation: "guilds"
       referencedColumns: ["id"]
+    }
+                  ]
+                },"roster_sync_run_changes": {
+                  Row: {
+                    "after_values": NonNullable<Json>,"before_values": NonNullable<Json>,"change_kind": string,"changed_fields": (string)[],"character_id": string,"character_ign": string,"guild_id": string,"id": string,"recorded_at": string,"sync_run_id": string
+                  }
+                  Insert: {
+                    "after_values"?: NonNullable<Json>,"before_values"?: NonNullable<Json>,"change_kind": string,"changed_fields": (string)[],"character_id": string,"character_ign": string,"guild_id": string,"id"?: string,"recorded_at"?: string,"sync_run_id": string
+                  }
+                  Update: {
+                    "after_values"?: NonNullable<Json>,"before_values"?: NonNullable<Json>,"change_kind"?: string,"changed_fields"?: (string)[],"character_id"?: string,"character_ign"?: string,"guild_id"?: string,"id"?: string,"recorded_at"?: string,"sync_run_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "roster_sync_run_changes_character_fk"
+      columns: ["guild_id","character_id"]
+isOneToOne: false
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "roster_sync_run_changes_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "roster_sync_run_changes_run_fk"
+      columns: ["guild_id","sync_run_id"]
+isOneToOne: false
+      referencedRelation: "roster_sync_runs"
+      referencedColumns: ["guild_id","id"]
     }
                   ]
                 },"roster_sync_runs": {
