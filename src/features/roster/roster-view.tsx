@@ -2,8 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { BulkRosterDialog } from "@/features/roster/bulk-roster-dialog";
+import { CharacterTagsDialog } from "@/features/roster/character-tags-dialog";
 import { CharacterOrganizerDialog } from "@/features/roster/character-organizer-dialog";
-import type { MasterRosterCharacter } from "@/features/roster/server";
+import type {
+  MasterRosterCharacter,
+  MasterRosterTag,
+} from "@/features/roster/server";
 import {
   filterAndSortRoster,
   getRosterClassOptions,
@@ -38,17 +42,22 @@ function CharacterStatus({
 export function RosterView({
   guildId,
   characters,
+  tags,
 }: {
   guildId: string;
   characters: MasterRosterCharacter[];
+  tags: MasterRosterTag[];
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] =
     useState<RosterStatusFilter>("active");
   const [className, setClassName] = useState("all");
+  const [tagId, setTagId] = useState("all");
   const [sort, setSort] =
     useState<RosterSort>("position-hierarchy");
   const [selectedCharacter, setSelectedCharacter] =
+    useState<MasterRosterCharacter | null>(null);
+  const [tagCharacter, setTagCharacter] =
     useState<MasterRosterCharacter | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
@@ -68,9 +77,10 @@ export function RosterView({
         query,
         status,
         className,
+        tagId,
         sort,
       }),
-    [characters, query, status, className, sort],
+    [characters, query, status, className, tagId, sort],
   );
   const selectedCharacters = useMemo(
     () =>
@@ -172,7 +182,7 @@ export function RosterView({
       </div>
 
       <Surface level={2} className="mt-6 p-4 sm:p-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_11rem_13rem_13rem]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_10rem_12rem_12rem_13rem]">
           <div>
             <label
               htmlFor="roster-search"
@@ -229,6 +239,28 @@ export function RosterView({
               {classOptions.map((option) => (
                 <option key={option} value={option}>
                   {option}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="roster-tag"
+              className="text-xs font-semibold text-[var(--text-tertiary)]"
+            >
+              Tag
+            </label>
+            <select
+              id="roster-tag"
+              value={tagId}
+              onChange={(event) => setTagId(event.target.value)}
+              className="mt-1.5 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 text-sm text-[var(--text-primary)]"
+            >
+              <option value="all">All tags</option>
+              {tags.map((tag) => (
+                <option key={tag.id} value={tag.id}>
+                  {tag.name}
                 </option>
               ))}
             </select>
@@ -354,7 +386,7 @@ export function RosterView({
             className="mt-4 hidden overflow-hidden xl:block"
           >
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1210px] border-collapse text-left text-sm">
+              <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
                 <thead className="bg-[var(--surface-3)] text-xs font-semibold tracking-[0.06em] text-[var(--text-tertiary)] uppercase">
                   <tr>
                     <th className="w-12 px-4 py-3">
@@ -406,6 +438,18 @@ export function RosterView({
                             <span>· {character.roleLabel}</span>
                           ) : null}
                         </div>
+                        {character.tags.length > 0 ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {character.tags.map((tag) => (
+                              <span
+                                key={tag.id}
+                                className="rounded-full border border-[var(--border-default)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]"
+                              >
+                                {tag.name}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3.5 text-[var(--text-secondary)]">
                         {character.className ?? "—"}
@@ -429,16 +473,26 @@ export function RosterView({
                         <CharacterStatus character={character} />
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() =>
-                            setSelectedCharacter(character)
-                          }
-                        >
-                          Edit
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setTagCharacter(character)}
+                          >
+                            Tags
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() =>
+                              setSelectedCharacter(character)
+                            }
+                          >
+                            Edit
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -461,6 +515,18 @@ export function RosterView({
                         ? ` · Lv. ${character.level}`
                         : ""}
                     </p>
+                    {character.tags.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {character.tags.map((tag) => (
+                          <span
+                            key={tag.id}
+                            className="rounded-full border border-[var(--border-default)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-secondary)]"
+                          >
+                            {tag.name}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex shrink-0 items-center gap-3">
@@ -520,7 +586,15 @@ export function RosterView({
                   </div>
                 </dl>
 
-                <div className="mt-4 border-t border-[var(--border-subtle)] pt-3">
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setTagCharacter(character)}
+                  >
+                    Manage Tags
+                  </Button>
                   <Button
                     type="button"
                     size="sm"
@@ -535,6 +609,13 @@ export function RosterView({
           </div>
         </>
       )}
+
+      <CharacterTagsDialog
+        guildId={guildId}
+        character={tagCharacter}
+        availableTags={tags}
+        onClose={() => setTagCharacter(null)}
+      />
 
       <CharacterOrganizerDialog
         guildId={guildId}

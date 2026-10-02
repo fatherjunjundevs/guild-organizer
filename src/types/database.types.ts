@@ -61,6 +61,37 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"character_roster_tags": {
+                  Row: {
+                    "character_id": string,"created_at": string,"created_by": string | null,"guild_id": string,"tag_id": string
+                  }
+                  Insert: {
+                    "character_id": string,"created_at"?: string,"created_by"?: string | null,"guild_id": string,"tag_id": string
+                  }
+                  Update: {
+                    "character_id"?: string,"created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"tag_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "character_roster_tags_character_fk"
+      columns: ["guild_id","character_id"]
+isOneToOne: false
+      referencedRelation: "characters"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "character_roster_tags_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "character_roster_tags_tag_fk"
+      columns: ["guild_id","tag_id"]
+isOneToOne: false
+      referencedRelation: "roster_tags"
+      referencedColumns: ["guild_id","id"]
+    }
+                  ]
                 },"characters": {
                   Row: {
                     "class_name": string | null,"created_at": string,"created_by": string | null,"gear_score": number | null,"gender": string | null,"guild_id": string,"guild_position": string | null,"id": string,"ign": string,"inactive_reason": string | null,"left_guild_at": string | null,"level": number | null,"online_status": string | null,"rtnw_first_seen_at": string | null,"rtnw_last_seen_at": string | null,"source_origin": string,"status": string,"title": string | null,"total_contribution": number | null,"updated_at": string,"weekly_activity": number | null,"weekly_contribution": number | null
@@ -261,6 +292,31 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"roster_tags": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"guild_id": string,"id": string,"name": string,"updated_at": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id": string,"id"?: string,"name": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "roster_tags_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "roster_tags_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    }
+                  ]
                 }
           }
           Views: {
@@ -287,6 +343,12 @@ isOneToOne: false
 "create_roster_character":
 { Args: { "p_class_name"?: string,"p_designation"?: string,"p_gear_score"?: number,"p_gender"?: string,"p_guild_id": string,"p_guild_position"?: string,"p_ign": string,"p_level"?: number,"p_online_status"?: string,"p_role_label"?: string,"p_title"?: string,"p_total_contribution"?: number,"p_weekly_activity"?: number,"p_weekly_contribution"?: number }; Returns: string
                            },
+"create_roster_tag":
+{ Args: { "p_guild_id": string,"p_name": string }; Returns: string
+                           },
+"delete_roster_tag":
+{ Args: { "p_tag_id": string }; Returns: undefined
+                           },
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
                            },
@@ -302,6 +364,9 @@ isOneToOne: false
                            },
 "regenerate_guild_invite":
 { Args: { "p_expires_at": string,"p_invite_id": string,"p_token_digest": string }; Returns: number
+                           },
+"rename_roster_tag":
+{ Args: { "p_name": string,"p_tag_id": string }; Returns: undefined
                            },
 "resolve_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: {
@@ -319,6 +384,9 @@ isOneToOne: false
                            },
 "set_character_roster_profile":
 { Args: { "p_character_id": string,"p_designation": string,"p_role_label": string }; Returns: undefined
+                           },
+"set_character_roster_tags":
+{ Args: { "p_character_id": string,"p_tag_ids": (string)[] }; Returns: number
                            },
 "set_guild_membership_role":
 { Args: { "p_membership_id": string,"p_role": string }; Returns: undefined

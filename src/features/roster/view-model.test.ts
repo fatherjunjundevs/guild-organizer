@@ -26,6 +26,10 @@ const rows: MasterRosterCharacter[] = [
     sourceOrigin: "rtnw_export",
     designation: "main",
     roleLabel: "Healer",
+    tags: [
+      { id: "tag-raid", name: "Raid Team" },
+      { id: "tag-siege", name: "Siege" },
+    ],
   },
   {
     id: "2",
@@ -46,6 +50,7 @@ const rows: MasterRosterCharacter[] = [
     sourceOrigin: "rtnw_export",
     designation: null,
     roleLabel: "Ranged DPS",
+    tags: [{ id: "tag-siege", name: "Siege" }],
   },
   {
     id: "3",
@@ -66,6 +71,7 @@ const rows: MasterRosterCharacter[] = [
     sourceOrigin: "rtnw_export",
     designation: null,
     roleLabel: "Tank",
+    tags: [],
   },
   {
     id: "4",
@@ -86,6 +92,7 @@ const rows: MasterRosterCharacter[] = [
     sourceOrigin: "manual",
     designation: "sub",
     roleLabel: "Support",
+    tags: [{ id: "tag-reserve", name: "Reserve" }],
   },
 ];
 
@@ -93,6 +100,7 @@ const baseOptions = {
   query: "",
   status: "all" as const,
   className: "all",
+  tagId: "all",
   sort: "gear-desc" as const,
 };
 
@@ -106,7 +114,7 @@ describe("roster view model", () => {
     });
   });
 
-  it("searches across IGN, class, position, and organizer role", () => {
+  it("searches across IGN, class, position, organizer role, and tags", () => {
     expect(
       filterAndSortRoster(rows, {
         ...baseOptions,
@@ -120,6 +128,22 @@ describe("roster view model", () => {
         query: "sniper",
       }).map((row) => row.id),
     ).toEqual(["2"]);
+
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        query: "reserve",
+      }).map((row) => row.id),
+    ).toEqual(["4"]);
+  });
+
+  it("filters by organizer tag", () => {
+    expect(
+      filterAndSortRoster(rows, {
+        ...baseOptions,
+        tagId: "tag-siege",
+      }).map((row) => row.id),
+    ).toEqual(["2", "1"]);
   });
 
   it("filters the active roster", () => {

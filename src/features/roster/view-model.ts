@@ -20,6 +20,7 @@ export type RosterViewOptions = {
   query: string;
   status: RosterStatusFilter;
   className: string;
+  tagId?: string;
   sort: RosterSort;
 };
 
@@ -38,18 +39,9 @@ function compareNullableNumbersDesc(
   left: number | null,
   right: number | null,
 ) {
-  if (left === null && right === null) {
-    return 0;
-  }
-
-  if (left === null) {
-    return 1;
-  }
-
-  if (right === null) {
-    return -1;
-  }
-
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
   return right - left;
 }
 
@@ -57,25 +49,14 @@ function compareNullableNumbersAsc(
   left: number | null,
   right: number | null,
 ) {
-  if (left === null && right === null) {
-    return 0;
-  }
-
-  if (left === null) {
-    return 1;
-  }
-
-  if (right === null) {
-    return -1;
-  }
-
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
   return left - right;
 }
 
 function getGuildPositionHierarchyRank(position: string | null) {
-  if (!position) {
-    return Number.MAX_SAFE_INTEGER;
-  }
+  if (!position) return Number.MAX_SAFE_INTEGER;
 
   return (
     GUILD_POSITION_HIERARCHY[position.trim().toLocaleLowerCase()] ??
@@ -156,9 +137,15 @@ export function filterAndSortRoster(
         return false;
       }
 
-      if (!query) {
-        return true;
+      if (
+        options.tagId &&
+        options.tagId !== "all" &&
+        !character.tags.some((tag) => tag.id === options.tagId)
+      ) {
+        return false;
       }
+
+      if (!query) return true;
 
       const searchable = [
         character.ign,
@@ -166,6 +153,7 @@ export function filterAndSortRoster(
         character.title,
         character.guildPosition,
         character.roleLabel,
+        ...character.tags.map((tag) => tag.name),
       ]
         .filter(Boolean)
         .join(" ")

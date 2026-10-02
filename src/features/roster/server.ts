@@ -3,6 +3,11 @@ import "server-only";
 import type { GuildAccess } from "@/features/guilds/server";
 import { createClient } from "@/lib/supabase/server";
 
+export type MasterRosterTag = {
+  id: string;
+  name: string;
+};
+
 export type MasterRosterCharacter = {
   id: string;
   ign: string;
@@ -22,20 +27,24 @@ export type MasterRosterCharacter = {
   sourceOrigin: string;
   designation: string | null;
   roleLabel: string | null;
+  tags: MasterRosterTag[];
 };
 
 export type MasterRosterLoadResult =
   | {
       status: "ready";
       characters: MasterRosterCharacter[];
+      tags: MasterRosterTag[];
     }
   | {
       status: "forbidden";
       characters: [];
+      tags: [];
     }
   | {
       status: "error";
       characters: [];
+      tags: [];
     };
 
 async function canManageRoster(
@@ -74,6 +83,7 @@ export async function loadMasterRoster(
     return {
       status: "forbidden",
       characters: [],
+      tags: [],
     };
   }
 
@@ -81,11 +91,17 @@ export async function loadMasterRoster(
     return {
       status: "error",
       characters: [],
+      tags: [],
     };
   }
 
   const supabase = await createClient();
-  const [charactersResult, profilesResult] = await Promise.all([
+  const [
+    charactersResult,
+    profilesResult,
+    tagsResult,
+    assignmentsResult,
+  ] = await Promise.all([
     supabase
       .from("characters")
       .select(
@@ -97,12 +113,27 @@ export async function loadMasterRoster(
       .from("character_roster_profiles")
       .select("character_id,designation,role_label")
       .eq("guild_id", access.guildId),
+    supabase
+      .from("roster_tags")
+      .select("id,name")
+      .eq("guild_id", access.guildId)
+      .order("name", { ascending: true }),
+    supabase
+      .from("character_roster_tags")
+      .select("character_id,tag_id")
+      .eq("guild_id", access.guildId),
   ]);
 
-  if (charactersResult.error || profilesResult.error) {
+  if (
+    charactersResult.error ||
+    profilesResult.error ||
+    tagsResult.error ||
+    assignmentsResult.error
+  ) {
     return {
       status: "error",
       characters: [],
+      tags: [],
     };
   }
 
@@ -113,8 +144,27 @@ export async function loadMasterRoster(
     ]),
   );
 
+  const tags: MasterRosterTag[] = (tagsResult.data ?? []).map((tag) => ({
+    id: tag.id,
+    name: tag.name,
+  }));
+
+  const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
+  const tagsByCharacter = new Map<string, MasterRosterTag[]>();
+
+  for (const assignment of assignmentsResult.data ?? []) {
+    const tag = tagsById.get(assignment.tag_id);
+    if (!tag) continue;
+
+    const characterTags =
+      tagsByCharacter.get(assignment.character_id) ?? [];
+    characterTags.push(tag);
+    tagsByCharacter.set(assignment.character_id, characterTags);
+  }
+
   return {
     status: "ready",
+    tags,
     characters: (charactersResult.data ?? []).map((character) => {
       const profile = profiles.get(character.id);
 
@@ -137,6 +187,7 @@ export async function loadMasterRoster(
         sourceOrigin: character.source_origin,
         designation: profile?.designation ?? null,
         roleLabel: profile?.role_label ?? null,
+        tags: tagsByCharacter.get(character.id) ?? [],
       };
     }),
   };
