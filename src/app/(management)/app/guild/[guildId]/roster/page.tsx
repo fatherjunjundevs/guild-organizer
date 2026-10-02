@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AddCharacterDialog } from "@/features/roster/add-character-dialog";
 import { getGuildAccess } from "@/features/guilds/server";
+import { RosterCustomFieldManagerDialog } from "@/features/roster/roster-custom-field-manager-dialog";
 import { RosterTagManagerDialog } from "@/features/roster/roster-tag-manager-dialog";
 import { RtnwImportDialog } from "@/features/roster/rtnw-import-dialog";
 import { RosterView } from "@/features/roster/roster-view";
@@ -76,11 +77,15 @@ export default async function GuildRosterPage({
             <p className="mt-2 max-w-3xl text-[var(--text-secondary)]">
               One permanent character database for {access.guildName}.
               Current RTNW data and historical Guild departures stay
-              separate from organizer-maintained roles and tags.
+              separate from organizer-maintained roles, tags, and custom fields.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <RosterCustomFieldManagerDialog
+              guildId={access.guildId}
+              fields={roster.customFields}
+            />
             <RosterTagManagerDialog
               guildId={access.guildId}
               tags={roster.tags}
@@ -106,6 +111,7 @@ export default async function GuildRosterPage({
             guildId={access.guildId}
             characters={roster.characters}
             tags={roster.tags}
+            customFields={roster.customFields}
           />
         )}
       </div>

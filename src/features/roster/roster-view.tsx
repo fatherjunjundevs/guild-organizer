@@ -6,6 +6,7 @@ import { CharacterTagsDialog } from "@/features/roster/character-tags-dialog";
 import { CharacterOrganizerDialog } from "@/features/roster/character-organizer-dialog";
 import type {
   MasterRosterCharacter,
+  MasterRosterCustomField,
   MasterRosterTag,
 } from "@/features/roster/server";
 import {
@@ -43,10 +44,12 @@ export function RosterView({
   guildId,
   characters,
   tags,
+  customFields,
 }: {
   guildId: string;
   characters: MasterRosterCharacter[];
   tags: MasterRosterTag[];
+  customFields: MasterRosterCustomField[];
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] =
@@ -620,6 +623,7 @@ export function RosterView({
       <CharacterOrganizerDialog
         guildId={guildId}
         character={selectedCharacter}
+        customFields={customFields}
         onClose={() => setSelectedCharacter(null)}
       />
     </>

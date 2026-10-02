@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { CharacterCustomFieldsForm } from "@/features/roster/character-custom-fields-form";
 import {
   updateCharacterOrganizationAction,
   updateManualCharacterDetailsAction,
@@ -14,7 +15,10 @@ import {
   ORGANIZER_ROLE_OPTIONS,
   RTNW_CLASS_OPTIONS,
 } from "@/features/roster/roster-field-options";
-import type { MasterRosterCharacter } from "@/features/roster/server";
+import type {
+  MasterRosterCharacter,
+  MasterRosterCustomField,
+} from "@/features/roster/server";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 
@@ -25,10 +29,12 @@ function fieldValue(value: string | number | null) {
 export function CharacterOrganizerDialog({
   guildId,
   character,
+  customFields,
   onClose,
 }: {
   guildId: string;
   character: MasterRosterCharacter | null;
+  customFields: MasterRosterCustomField[];
   onClose: () => void;
 }) {
   const router = useRouter();
@@ -409,6 +415,13 @@ export function CharacterOrganizerDialog({
             </Button>
           </div>
         </form>
+
+        <CharacterCustomFieldsForm
+          guildId={guildId}
+          character={character}
+          fields={customFields}
+          onSaved={finishSuccess}
+        />
       </div>
     </dialog>
   );

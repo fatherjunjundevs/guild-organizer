@@ -1,11 +1,22 @@
 import "server-only";
 
 import type { GuildAccess } from "@/features/guilds/server";
+import type {
+  RosterCustomFieldType,
+  RosterCustomFieldValue,
+} from "@/features/roster/custom-fields";
 import { createClient } from "@/lib/supabase/server";
 
 export type MasterRosterTag = {
   id: string;
   name: string;
+};
+
+export type MasterRosterCustomField = {
+  id: string;
+  name: string;
+  fieldType: RosterCustomFieldType;
+  selectOptions: string[];
 };
 
 export type MasterRosterCharacter = {
@@ -28,6 +39,7 @@ export type MasterRosterCharacter = {
   designation: string | null;
   roleLabel: string | null;
   tags: MasterRosterTag[];
+  customFieldValues?: Record<string, RosterCustomFieldValue>;
 };
 
 export type MasterRosterLoadResult =
@@ -35,16 +47,19 @@ export type MasterRosterLoadResult =
       status: "ready";
       characters: MasterRosterCharacter[];
       tags: MasterRosterTag[];
+      customFields: MasterRosterCustomField[];
     }
   | {
       status: "forbidden";
       characters: [];
       tags: [];
+      customFields: [];
     }
   | {
       status: "error";
       characters: [];
       tags: [];
+      customFields: [];
     };
 
 async function canManageRoster(
@@ -84,6 +99,7 @@ export async function loadMasterRoster(
       status: "forbidden",
       characters: [],
       tags: [],
+      customFields: [],
     };
   }
 
@@ -92,6 +108,7 @@ export async function loadMasterRoster(
       status: "error",
       characters: [],
       tags: [],
+      customFields: [],
     };
   }
 
@@ -101,6 +118,8 @@ export async function loadMasterRoster(
     profilesResult,
     tagsResult,
     assignmentsResult,
+    customFieldsResult,
+    customValuesResult,
   ] = await Promise.all([
     supabase
       .from("characters")
@@ -122,18 +141,30 @@ export async function loadMasterRoster(
       .from("character_roster_tags")
       .select("character_id,tag_id")
       .eq("guild_id", access.guildId),
+    supabase
+      .from("roster_custom_fields")
+      .select("id,name,field_type,select_options")
+      .eq("guild_id", access.guildId)
+      .order("created_at", { ascending: true }),
+    supabase
+      .from("character_roster_custom_field_values")
+      .select("character_id,field_id,value")
+      .eq("guild_id", access.guildId),
   ]);
 
   if (
     charactersResult.error ||
     profilesResult.error ||
     tagsResult.error ||
-    assignmentsResult.error
+    assignmentsResult.error ||
+    customFieldsResult.error ||
+    customValuesResult.error
   ) {
     return {
       status: "error",
       characters: [],
       tags: [],
+      customFields: [],
     };
   }
 
@@ -148,6 +179,34 @@ export async function loadMasterRoster(
     id: tag.id,
     name: tag.name,
   }));
+
+  const customFields: MasterRosterCustomField[] =
+    (customFieldsResult.data ?? []).map((field) => ({
+      id: field.id,
+      name: field.name,
+      fieldType: field.field_type as RosterCustomFieldType,
+      selectOptions: field.select_options,
+    }));
+
+  const customFieldValuesByCharacter = new Map<
+    string,
+    Record<string, RosterCustomFieldValue>
+  >();
+
+  for (const customValue of customValuesResult.data ?? []) {
+    if (
+      typeof customValue.value !== "string" &&
+      typeof customValue.value !== "number" &&
+      typeof customValue.value !== "boolean"
+    ) {
+      continue;
+    }
+
+    const values =
+      customFieldValuesByCharacter.get(customValue.character_id) ?? {};
+    values[customValue.field_id] = customValue.value;
+    customFieldValuesByCharacter.set(customValue.character_id, values);
+  }
 
   const tagsById = new Map(tags.map((tag) => [tag.id, tag]));
   const tagsByCharacter = new Map<string, MasterRosterTag[]>();
@@ -165,6 +224,7 @@ export async function loadMasterRoster(
   return {
     status: "ready",
     tags,
+    customFields,
     characters: (charactersResult.data ?? []).map((character) => {
       const profile = profiles.get(character.id);
 
@@ -188,6 +248,8 @@ export async function loadMasterRoster(
         designation: profile?.designation ?? null,
         roleLabel: profile?.role_label ?? null,
         tags: tagsByCharacter.get(character.id) ?? [],
+        customFieldValues:
+          customFieldValuesByCharacter.get(character.id) ?? {},
       };
     }),
   };
