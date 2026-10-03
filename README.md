@@ -1,18 +1,56 @@
-# Ragnarok: The New World ? Guild Organizer
+# Ragnarok: The New World — Guild Organizer
 
 An unofficial community tool for organizing guild rosters, events, assignments, and published lineups for Ragnarok: The New World.
 
 ## Current Development Status
 
-Phase 3.1 ? Application Foundation
+**Official roadmap:** Phase 3 — Master Guild Roster ✅
+
+**Current status:** Phase 3 quality-gated complete ✅
+
+**Next phase:** Phase 4 — Event Template Designer ⏳
+
+Implemented so far includes:
 
 - Next.js App Router + TypeScript
 - Tailwind CSS + semantic design tokens
 - Local Supabase development stack
-- Browser/server Supabase clients
+- Authenticated multi-Guild foundation
+- Guild roles and Officer capabilities
+- Invitation/access-link foundation
+- Master Guild Roster data model
+- Secure roster RPCs and Row Level Security
+- Official RTNW CSV preview/apply synchronization
+- Exact-IGN import semantics with historical retention
+- Desktop/mobile roster UI
+- Guild hierarchy sorting and roster filters
+- Manual character creation/editing with RTNW field protection
+- Organizer designation and role metadata
+- Bulk roster management
+- Guild-specific reusable roster tags
+- Guild-defined custom organizer fields with typed values, roster search/filter integration, and RTNW-safe persistence
+- Generic CSV/XLSX spreadsheet import with mapping, validation, duplicate handling, preview, and transactional apply
+- Explicit Character reconciliation for same-character identity changes without automatic rename guessing
+- Import and reconciliation history for organizer visibility and audit context
+- Responsive roster hardening with loading, empty/error, and accessibility states
+- Measured larger-roster hardening with 200-character render pages while full-roster filtering/sorting remains intact
 - Vitest + Testing Library
 - Playwright end-to-end testing
 - GitHub Actions CI
+
+The project is currently in active development and is not yet a public v1 release.
+
+## Product Documentation
+
+The repository keeps the product plan and engineering expectations alongside the code:
+
+- [`docs/PROJECT_BLUEPRINT.md`](docs/PROJECT_BLUEPRINT.md)
+- [`docs/ROADMAP.md`](docs/ROADMAP.md)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md)
+- [`docs/PHASE_3_QUALITY_GATE.md`](docs/PHASE_3_QUALITY_GATE.md)
+
+These are authoritative project references and should be updated when product decisions change.
 
 ## Requirements
 
@@ -23,44 +61,20 @@ Phase 3.1 ? Application Foundation
 
 ## Local Setup
 
-Clone the repository and install dependencies:
-
 ```bash
 pnpm install
-```
-
-Start Docker Desktop, then start the local Supabase stack:
-
-```bash
 pnpm db:start
+pnpm dev
 ```
 
-Copy the environment template:
+Copy `.env.example` to `.env.local` and configure the local Supabase URL and publishable key.
 
-```text
-.env.example -> .env.local
-```
-
-Configure `.env.local` with your local Supabase Project URL and publishable key.
-
-The default local ports for this development environment are:
+Local development ports:
 
 - API: http://127.0.0.1:55421
 - Database: 127.0.0.1:55422
 - Studio: http://127.0.0.1:55423
 - Mailpit: http://127.0.0.1:55424
-
-Start the Next.js development server:
-
-```bash
-pnpm dev
-```
-
-Then open:
-
-```text
-http://localhost:3000
-```
 
 The development-only design system playground is available at:
 
@@ -70,38 +84,17 @@ http://localhost:3000/design-system
 
 ## Quality Checks
 
-Run linting:
-
 ```bash
 pnpm lint
-```
-
-Run unit/component tests:
-
-```bash
 pnpm test
-```
-
-Run end-to-end tests:
-
-```bash
-pnpm test:e2e
-```
-
-Run the production build:
-
-```bash
 pnpm build
+pnpm test:e2e
+pnpm db:lint
+pnpm db:test
+pnpm db:types:check
 ```
 
-## Database Commands
-
-```bash
-pnpm db:start
-pnpm db:stop
-pnpm db:status
-pnpm db:reset
-```
+A feature being functional does **not** make it finished. See `docs/QUALITY_GATES.md`.
 
 ## Architecture
 
@@ -112,20 +105,29 @@ The application is organized around four primary experiences:
 - Event Focus
 - Member
 
-Core product model:
+Core event model:
 
 ```text
-Event Type -> Template -> Event -> Event-owned Structure -> Assignments -> Published Version
+Event Type
+  -> Template
+  -> Event
+  -> Event-owned Structural Snapshot
+  -> Assignments
+  -> Published Version
 ```
 
-Published views are intentionally separated from draft management state.
+Published state is intentionally separated from draft management state.
 
 ## Security
 
 - Never commit `.env.local`.
 - Never expose Supabase secret/service-role keys to browser code.
 - Browser code uses only the Supabase publishable key.
-- Row Level Security and transactional RPCs will be authoritative for protected application data.
+- Protected application data is enforced by Row Level Security and capability-gated transactional RPCs.
+- UI visibility is never considered authorization.
+- Cross-Guild access must be denied at the database/server boundary.
+
+Security is an ongoing quality track, not a one-time feature.
 
 ## Disclaimer
 
