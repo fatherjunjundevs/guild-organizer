@@ -7,6 +7,7 @@ export type RosterStatusFilter =
   | "active"
   | "left"
   | "inactive"
+  | "reconciled"
   | "all";
 
 export type RosterSort =
@@ -111,12 +112,15 @@ export function getRosterSummary(
   let active = 0;
   let left = 0;
   let inactive = 0;
+  let reconciled = 0;
 
   for (const character of characters) {
     if (character.status === "active") {
       active += 1;
     } else if (character.inactiveReason === "left_guild") {
       left += 1;
+    } else if (character.inactiveReason === "reconciled") {
+      reconciled += 1;
     } else {
       inactive += 1;
     }
@@ -127,6 +131,7 @@ export function getRosterSummary(
     active,
     left,
     inactive,
+    reconciled,
   };
 }
 
@@ -165,8 +170,16 @@ export function filterAndSortRoster(
         options.status === "inactive" &&
         (
           character.status !== "inactive" ||
-          character.inactiveReason === "left_guild"
+          character.inactiveReason === "left_guild" ||
+          character.inactiveReason === "reconciled"
         )
+      ) {
+        return false;
+      }
+
+      if (
+        options.status === "reconciled" &&
+        character.inactiveReason !== "reconciled"
       ) {
         return false;
       }
@@ -224,6 +237,7 @@ export function filterAndSortRoster(
         character.title,
         character.guildPosition,
         character.roleLabel,
+        character.reconciledIntoIgn,
         ...character.tags.map((tag) => tag.name),
         ...getCustomFieldSearchTokens(
           character,

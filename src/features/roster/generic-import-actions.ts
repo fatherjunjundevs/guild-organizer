@@ -135,6 +135,22 @@ function rowsAsJson(rows: GenericRosterRpcRow[]) {
   return rows as unknown as Json;
 }
 
+function reconciledImportConflictMessage(
+  code: string | undefined,
+  message: string | undefined,
+) {
+  if (
+    code === "55000" &&
+    message
+      ?.toLocaleLowerCase()
+      .includes("reconciled historical character")
+  ) {
+    return "This import contains an IGN that is already preserved as a reconciled historical identity. The import is blocked because that IGN could have been reused by a different Character. Guild Organizer will not guess or redirect it automatically; resolve the identity explicitly before importing.";
+  }
+
+  return null;
+}
+
 export async function previewGenericSpreadsheetImportAction(input: {
   guildId: string;
   rows: GenericRosterRpcRow[];
@@ -167,6 +183,7 @@ export async function previewGenericSpreadsheetImportAction(input: {
     return {
       ok: false,
       message:
+        reconciledImportConflictMessage(error.code, error.message) ??
         "Unable to preview this spreadsheet import. Check your import permission and try again.",
     };
   }
@@ -229,6 +246,7 @@ export async function applyGenericSpreadsheetImportAction(input: {
     return {
       ok: false,
       message:
+        reconciledImportConflictMessage(error?.code, error?.message) ??
         "Unable to apply this spreadsheet import. No confirmed result was returned.",
     };
   }

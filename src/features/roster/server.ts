@@ -6,6 +6,7 @@ import type {
   RosterCustomFieldValue,
 } from "@/features/roster/custom-fields";
 import type { RosterImportRunSummary } from "@/features/roster/import-history";
+import type { CharacterReconciliationHistoryEntry } from "@/features/roster/character-reconciliation";
 import { createClient } from "@/lib/supabase/server";
 
 export type MasterRosterTag = {
@@ -37,6 +38,9 @@ export type MasterRosterCharacter = {
   inactiveReason: string | null;
   leftGuildAt: string | null;
   sourceOrigin: string;
+  reconciledIntoCharacterId?: string | null;
+  reconciledIntoIgn?: string | null;
+  reconciledAt?: string | null;
   designation: string | null;
   roleLabel: string | null;
   tags: MasterRosterTag[];
@@ -162,7 +166,7 @@ export async function loadMasterRoster(
     supabase
       .from("characters")
       .select(
-        "id,ign,level,class_name,title,gender,guild_position,gear_score,weekly_activity,weekly_contribution,total_contribution,online_status,status,inactive_reason,left_guild_at,source_origin",
+        "id,ign,level,class_name,title,gender,guild_position,gear_score,weekly_activity,weekly_contribution,total_contribution,online_status,status,inactive_reason,left_guild_at,source_origin,reconciled_into_character_id,reconciled_at",
       )
       .eq("guild_id", access.guildId)
       .order("ign", { ascending: true }),
@@ -205,6 +209,11 @@ export async function loadMasterRoster(
       customFields: [],
     };
   }
+
+  const characterRows = charactersResult.data ?? [];
+  const characterIgnById = new Map(
+    characterRows.map((character) => [character.id, character.ign]),
+  );
 
   const profiles = new Map(
     (profilesResult.data ?? []).map((profile) => [
@@ -263,7 +272,7 @@ export async function loadMasterRoster(
     status: "ready",
     tags,
     customFields,
-    characters: (charactersResult.data ?? []).map((character) => {
+    characters: characterRows.map((character) => {
       const profile = profiles.get(character.id);
 
       return {
@@ -283,6 +292,14 @@ export async function loadMasterRoster(
         inactiveReason: character.inactive_reason,
         leftGuildAt: character.left_guild_at,
         sourceOrigin: character.source_origin,
+        reconciledIntoCharacterId:
+          character.reconciled_into_character_id,
+        reconciledIntoIgn: character.reconciled_into_character_id
+          ? characterIgnById.get(
+              character.reconciled_into_character_id,
+            ) ?? null
+          : null,
+        reconciledAt: character.reconciled_at,
         designation: profile?.designation ?? null,
         roleLabel: profile?.role_label ?? null,
         tags: tagsByCharacter.get(character.id) ?? [],
@@ -361,6 +378,59 @@ export async function loadRosterImportHistory(
         ? displayNames.get(run.imported_by) ?? "Organizer"
         : null,
       appliedAt: run.applied_at,
+    })),
+  };
+}
+
+export type CharacterReconciliationHistoryLoadResult =
+  | {
+      status: "ready";
+      entries: CharacterReconciliationHistoryEntry[];
+    }
+  | {
+      status: "forbidden" | "error";
+      entries: [];
+    };
+
+export async function loadCharacterReconciliationHistory(
+  access: GuildAccess,
+): Promise<CharacterReconciliationHistoryLoadResult> {
+  const authorization = await canManageRoster(access);
+
+  if (authorization !== "allowed") {
+    return {
+      status: authorization,
+      entries: [],
+    };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("character_reconciliations")
+    .select(
+      "id,source_character_id,target_character_id,source_ign_snapshot,target_ign_snapshot,note,reconciled_at",
+    )
+    .eq("guild_id", access.guildId)
+    .order("reconciled_at", { ascending: false })
+    .limit(20);
+
+  if (error) {
+    return {
+      status: "error",
+      entries: [],
+    };
+  }
+
+  return {
+    status: "ready",
+    entries: (data ?? []).map((entry) => ({
+      id: entry.id,
+      sourceCharacterId: entry.source_character_id,
+      targetCharacterId: entry.target_character_id,
+      sourceIgn: entry.source_ign_snapshot,
+      targetIgn: entry.target_ign_snapshot,
+      note: entry.note,
+      reconciledAt: entry.reconciled_at,
     })),
   };
 }

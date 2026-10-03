@@ -159,6 +159,7 @@ describe("roster view model", () => {
       active: 2,
       left: 1,
       inactive: 1,
+      reconciled: 0,
     });
   });
 
@@ -280,6 +281,42 @@ describe("roster view model", () => {
 
     expect(
       filterAndSortRoster(rows, {
+        ...baseOptions,
+        status: "inactive",
+      }).map((row) => row.id),
+    ).toEqual(["4"]);
+  });
+
+  it("separates reconciled historical identities from other inactive rows", () => {
+    const reconciled: MasterRosterCharacter = {
+      ...rows[2],
+      id: "5",
+      ign: "OldName",
+      inactiveReason: "reconciled",
+      leftGuildAt: null,
+      reconciledIntoCharacterId: "1",
+      reconciledIntoIgn: "焱｜FatherJunJun",
+      reconciledAt: "2026-10-03T15:00:00Z",
+    };
+    const withReconciled = [...rows, reconciled];
+
+    expect(getRosterSummary(withReconciled)).toEqual({
+      total: 5,
+      active: 2,
+      left: 1,
+      inactive: 1,
+      reconciled: 1,
+    });
+
+    expect(
+      filterAndSortRoster(withReconciled, {
+        ...baseOptions,
+        status: "reconciled",
+      }).map((row) => row.id),
+    ).toEqual(["5"]);
+
+    expect(
+      filterAndSortRoster(withReconciled, {
         ...baseOptions,
         status: "inactive",
       }).map((row) => row.id),

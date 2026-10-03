@@ -70,6 +70,10 @@ function CharacterStatus({
 }: {
   character: MasterRosterCharacter;
 }) {
+  if (character.reconciledIntoCharacterId) {
+    return <StatusChip tone="neutral">Reconciled</StatusChip>;
+  }
+
   if (character.status === "active") {
     return <StatusChip tone="success">Active</StatusChip>;
   }
@@ -165,20 +169,37 @@ export function RosterView({
       sort,
     ],
   );
+  const selectableVisibleCharacters = useMemo(
+    () =>
+      visibleCharacters.filter(
+        (character) => !character.reconciledIntoCharacterId,
+      ),
+    [visibleCharacters],
+  );
   const selectedCharacters = useMemo(
     () =>
-      characters.filter((character) =>
-        selectedIds.has(character.id),
+      characters.filter(
+        (character) =>
+          selectedIds.has(character.id) &&
+          !character.reconciledIntoCharacterId,
       ),
     [characters, selectedIds],
   );
   const allVisibleSelected =
-    visibleCharacters.length > 0 &&
-    visibleCharacters.every((character) =>
+    selectableVisibleCharacters.length > 0 &&
+    selectableVisibleCharacters.every((character) =>
       selectedIds.has(character.id),
     );
 
   function toggleCharacterSelection(characterId: string) {
+    const character = characters.find(
+      (candidate) => candidate.id === characterId,
+    );
+
+    if (!character || character.reconciledIntoCharacterId) {
+      return;
+    }
+
     setSelectedIds((current) => {
       const next = new Set(current);
 
@@ -197,11 +218,11 @@ export function RosterView({
       const next = new Set(current);
 
       if (allVisibleSelected) {
-        for (const character of visibleCharacters) {
+        for (const character of selectableVisibleCharacters) {
           next.delete(character.id);
         }
       } else {
-        for (const character of visibleCharacters) {
+        for (const character of selectableVisibleCharacters) {
           next.add(character.id);
         }
       }
@@ -216,7 +237,7 @@ export function RosterView({
 
   return (
     <>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <Surface level={2} className="p-4">
           <p className="text-xs font-semibold tracking-[0.08em] text-[var(--text-tertiary)] uppercase">
             Current
@@ -248,6 +269,18 @@ export function RosterView({
           </p>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Manually inactive
+          </p>
+        </Surface>
+
+        <Surface level={2} className="p-4">
+          <p className="text-xs font-semibold tracking-[0.08em] text-[var(--text-tertiary)] uppercase">
+            Reconciled
+          </p>
+          <p className="mt-2 text-2xl font-semibold">
+            {summary.reconciled}
+          </p>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Resolved historical identities
           </p>
         </Surface>
 
@@ -301,6 +334,7 @@ export function RosterView({
               <option value="active">Active</option>
               <option value="left">Left Guild</option>
               <option value="inactive">Inactive</option>
+              <option value="reconciled">Reconciled</option>
               <option value="all">All stored</option>
             </select>
           </div>
@@ -499,7 +533,7 @@ export function RosterView({
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            {visibleCharacters.length > 0 ? (
+            {selectableVisibleCharacters.length > 0 ? (
               <Button
                 type="button"
                 size="sm"
@@ -595,17 +629,28 @@ export function RosterView({
                         <input
                           type="checkbox"
                           checked={selectedIds.has(character.id)}
+                          disabled={Boolean(character.reconciledIntoCharacterId)}
                           onChange={() =>
                             toggleCharacterSelection(character.id)
                           }
                           aria-label={`Select ${character.ign}`}
-                          className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                          title={
+                            character.reconciledIntoCharacterId
+                              ? "Reconciled historical Characters are read-only."
+                              : undefined
+                          }
+                          className="h-4 w-4 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
                         />
                       </td>
                       <td className="px-4 py-3.5">
                         <p className="font-semibold text-[var(--text-primary)]">
                           {character.ign}
                         </p>
+                        {character.reconciledIntoIgn ? (
+                          <p className="mt-1 text-xs font-semibold text-[var(--text-tertiary)]">
+                            Historical identity → {character.reconciledIntoIgn}
+                          </p>
+                        ) : null}
                         <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-[var(--text-tertiary)]">
                           {character.designation ? (
                             <span className="capitalize">
@@ -655,26 +700,32 @@ export function RosterView({
                         <CharacterStatus character={character} />
                       </td>
                       <td className="px-4 py-3.5 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setTagCharacter(character)}
-                          >
-                            Tags
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              setSelectedCharacter(character)
-                            }
-                          >
-                            Edit
-                          </Button>
-                        </div>
+                        {character.reconciledIntoCharacterId ? (
+                          <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+                            History only
+                          </span>
+                        ) : (
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setTagCharacter(character)}
+                            >
+                              Tags
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() =>
+                                setSelectedCharacter(character)
+                              }
+                            >
+                              Edit
+                            </Button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -691,6 +742,11 @@ export function RosterView({
                     <p className="truncate font-semibold">
                       {character.ign}
                     </p>
+                    {character.reconciledIntoIgn ? (
+                      <p className="mt-1 text-xs font-semibold text-[var(--text-tertiary)]">
+                        Historical identity → {character.reconciledIntoIgn}
+                      </p>
+                    ) : null}
                     <p className="mt-1 text-sm text-[var(--text-secondary)]">
                       {character.className ?? "Class unavailable"}
                       {character.level !== null
@@ -719,11 +775,17 @@ export function RosterView({
                     <input
                       type="checkbox"
                       checked={selectedIds.has(character.id)}
+                      disabled={Boolean(character.reconciledIntoCharacterId)}
                       onChange={() =>
                         toggleCharacterSelection(character.id)
                       }
                       aria-label={`Select ${character.ign}`}
-                      className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                      title={
+                        character.reconciledIntoCharacterId
+                          ? "Reconciled historical Characters are read-only."
+                          : undefined
+                      }
+                      className="h-4 w-4 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-40"
                     />
                     <CharacterStatus character={character} />
                   </div>
@@ -773,22 +835,30 @@ export function RosterView({
                 </dl>
 
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border-subtle)] pt-3">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setTagCharacter(character)}
-                  >
-                    Manage Tags
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setSelectedCharacter(character)}
-                  >
-                    Edit Character
-                  </Button>
+                  {character.reconciledIntoCharacterId ? (
+                    <p className="text-xs font-semibold text-[var(--text-tertiary)]">
+                      Historical identity is read-only.
+                    </p>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setTagCharacter(character)}
+                      >
+                        Manage Tags
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSelectedCharacter(character)}
+                      >
+                        Edit Character
+                      </Button>
+                    </>
+                  )}
                 </div>
               </Surface>
             ))}

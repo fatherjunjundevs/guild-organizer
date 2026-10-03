@@ -52,6 +52,22 @@ function rosterPath(guildId: string) {
   return `/app/guild/${guildId}/roster`;
 }
 
+function reconciledImportConflictMessage(
+  code: string | undefined,
+  message: string | undefined,
+) {
+  if (
+    code === "55000" &&
+    message
+      ?.toLocaleLowerCase()
+      .includes("reconciled historical character")
+  ) {
+    return "This import contains an IGN that is already preserved as a reconciled historical identity. The import is blocked because that IGN could have been reused by a different Character. Guild Organizer will not guess or redirect it automatically; resolve the identity explicitly before importing.";
+  }
+
+  return null;
+}
+
 export async function previewRtnwRosterSyncAction(input: {
   guildId: string;
   rows: RtnwRosterRow[];
@@ -88,6 +104,7 @@ export async function previewRtnwRosterSyncAction(input: {
     return {
       ok: false,
       message:
+        reconciledImportConflictMessage(error.code, error.message) ??
         "Unable to preview this roster sync. Check your import permission and try again.",
     };
   }
@@ -157,6 +174,7 @@ export async function applyRtnwRosterSyncAction(input: {
     return {
       ok: false,
       message:
+        reconciledImportConflictMessage(error?.code, error?.message) ??
         "Unable to apply this roster sync. No confirmed result was returned.",
     };
   }

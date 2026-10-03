@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AddCharacterDialog } from "@/features/roster/add-character-dialog";
+import { CharacterReconciliationDialog } from "@/features/roster/character-reconciliation-dialog";
 import { GenericSpreadsheetImportDialog } from "@/features/roster/generic-spreadsheet-import-dialog";
 import { ImportHistoryDialog } from "@/features/roster/import-history-dialog";
 import { getGuildAccess } from "@/features/guilds/server";
@@ -8,6 +9,7 @@ import { RosterTagManagerDialog } from "@/features/roster/roster-tag-manager-dia
 import { RtnwImportDialog } from "@/features/roster/rtnw-import-dialog";
 import { RosterView } from "@/features/roster/roster-view";
 import {
+  loadCharacterReconciliationHistory,
   loadMasterRoster,
   loadRosterImportHistory,
 } from "@/features/roster/server";
@@ -70,7 +72,10 @@ export default async function GuildRosterPage({
     );
   }
 
-  const importHistory = await loadRosterImportHistory(access);
+  const [importHistory, reconciliationHistory] = await Promise.all([
+    loadRosterImportHistory(access),
+    loadCharacterReconciliationHistory(access),
+  ]);
 
   return (
     <div className="px-5 py-8 sm:px-8 lg:px-10">
@@ -89,6 +94,19 @@ export default async function GuildRosterPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <CharacterReconciliationDialog
+              guildId={access.guildId}
+              characters={roster.characters}
+              customFields={roster.customFields}
+              history={
+                reconciliationHistory.status === "ready"
+                  ? reconciliationHistory.entries
+                  : []
+              }
+              historyAvailable={
+                reconciliationHistory.status === "ready"
+              }
+            />
             {importHistory.status === "ready" ? (
               <ImportHistoryDialog
                 guildId={access.guildId}
