@@ -213,6 +213,7 @@ export function RosterCustomFieldManagerDialog({
 
       <dialog
         ref={dialogRef}
+        aria-labelledby="roster-custom-fields-dialog-title"
         onClose={resetTransientState}
         onPointerDown={(event) => {
           backdropPointerStartedRef.current =
@@ -243,7 +244,12 @@ export function RosterCustomFieldManagerDialog({
       >
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4 sm:px-6">
           <div>
-            <h2 className="text-xl font-semibold">Custom Fields</h2>
+            <h2
+              id="roster-custom-fields-dialog-title"
+              className="text-xl font-semibold"
+            >
+              Custom Fields
+            </h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
               Define Guild-specific organizer fields for roster characters.
             </p>

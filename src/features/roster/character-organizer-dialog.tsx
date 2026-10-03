@@ -106,6 +106,7 @@ export function CharacterOrganizerDialog({
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby="character-organizer-dialog-title"
       onClose={() => {
         setDetailsBusy(false);
         setOrganizationBusy(false);
@@ -151,7 +152,11 @@ export function CharacterOrganizerDialog({
               ? "RTNW synced"
               : "Manual"}
           </StatusChip>
-          <h2 className="mt-2 truncate text-xl font-semibold">
+          <h2
+            id="character-organizer-dialog-title"
+            className="mt-2 truncate text-xl font-semibold"
+          >
+            <span className="sr-only">Character organizer for </span>
             {character.ign}
           </h2>
           <p className="mt-1 text-sm text-[var(--text-secondary)]">

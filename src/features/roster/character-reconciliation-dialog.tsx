@@ -506,8 +506,9 @@ export function CharacterReconciliationDialog({
                   level={2}
                   className="border-[color-mix(in_srgb,var(--warning)_35%,transparent)] p-4"
                 >
-                  <label className="flex cursor-pointer items-start gap-3">
+                  <div className="flex items-start gap-3">
                     <input
+                      id="character-reconciliation-acknowledgement"
                       type="checkbox"
                       checked={acknowledged}
                       disabled={busy}
@@ -516,7 +517,10 @@ export function CharacterReconciliationDialog({
                       }
                       className="mt-1 h-4 w-4 shrink-0 accent-[var(--accent)]"
                     />
-                    <span>
+                    <label
+                      htmlFor="character-reconciliation-acknowledgement"
+                      className="cursor-pointer"
+                    >
                       <span className="block text-sm font-semibold">
                         Confirm identity direction
                       </span>
@@ -527,8 +531,8 @@ export function CharacterReconciliationDialog({
                         canonical Character. This is an explicit organizer
                         decision, not an automatic rename guess.
                       </span>
-                    </span>
-                  </label>
+                    </label>
+                  </div>
                 </Surface>
               ) : null}
 

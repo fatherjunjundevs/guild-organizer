@@ -710,6 +710,7 @@ export function RosterView({
                               type="button"
                               size="sm"
                               variant="ghost"
+                              aria-label={`Manage tags for ${character.ign}`}
                               onClick={() => setTagCharacter(character)}
                             >
                               Tags
@@ -718,6 +719,7 @@ export function RosterView({
                               type="button"
                               size="sm"
                               variant="ghost"
+                              aria-label={`Edit ${character.ign}`}
                               onClick={() =>
                                 setSelectedCharacter(character)
                               }
@@ -845,6 +847,7 @@ export function RosterView({
                         type="button"
                         size="sm"
                         variant="secondary"
+                        aria-label={`Manage tags for ${character.ign}`}
                         onClick={() => setTagCharacter(character)}
                       >
                         Manage Tags
@@ -853,6 +856,7 @@ export function RosterView({
                         type="button"
                         size="sm"
                         variant="secondary"
+                        aria-label={`Edit ${character.ign}`}
                         onClick={() => setSelectedCharacter(character)}
                       >
                         Edit Character

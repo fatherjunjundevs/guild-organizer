@@ -70,6 +70,7 @@ export function AddCharacterDialog({
 
       <dialog
         ref={dialogRef}
+        aria-labelledby="add-character-dialog-title"
         onClose={reset}
         onPointerDown={(event) => {
           backdropPointerStartedRef.current =
@@ -103,7 +104,10 @@ export function AddCharacterDialog({
         <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4 sm:px-6">
           <div>
             <StatusChip tone="accent">Manual entry</StatusChip>
-            <h2 className="mt-2 text-xl font-semibold">
+            <h2
+              id="add-character-dialog-title"
+              className="mt-2 text-xl font-semibold"
+            >
               Add Guild Character
             </h2>
           </div>

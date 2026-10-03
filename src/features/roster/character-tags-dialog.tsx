@@ -63,6 +63,7 @@ export function CharacterTagsDialog({
   return (
     <dialog
       ref={dialogRef}
+      aria-labelledby="character-tags-dialog-title"
       onClose={() => {
         setBusy(false);
         setMessage("");
@@ -98,7 +99,11 @@ export function CharacterTagsDialog({
       <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4 sm:px-6">
         <div className="min-w-0">
           <StatusChip tone="accent">Organizer Tags</StatusChip>
-          <h2 className="mt-2 truncate text-xl font-semibold">
+          <h2
+            id="character-tags-dialog-title"
+            className="mt-2 truncate text-xl font-semibold"
+          >
+            <span className="sr-only">Tags for </span>
             {character.ign}
           </h2>
         </div>

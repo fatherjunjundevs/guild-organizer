@@ -241,6 +241,7 @@ export function RtnwImportDialog({
 
       <dialog
         ref={dialogRef}
+        aria-labelledby="rtnw-import-dialog-title"
         onClose={resetImport}
         className="m-auto w-[min(54rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 backdrop:bg-black/70"
       >
@@ -249,7 +250,10 @@ export function RtnwImportDialog({
             <p className="text-xs font-semibold tracking-[0.12em] text-[var(--accent)] uppercase">
               Official game export
             </p>
-            <h2 className="mt-1 text-xl font-semibold">
+            <h2
+              id="rtnw-import-dialog-title"
+              className="mt-1 text-xl font-semibold"
+            >
               Sync RTNW Guild Roster
             </h2>
           </div>

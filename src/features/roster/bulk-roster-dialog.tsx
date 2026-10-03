@@ -73,6 +73,7 @@ export function BulkRosterDialog({
 
       <dialog
         ref={dialogRef}
+        aria-labelledby="bulk-roster-dialog-title"
         onClose={reset}
         className="m-auto w-[min(42rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
       >
@@ -81,7 +82,10 @@ export function BulkRosterDialog({
             <StatusChip tone="accent">
               {characters.length} selected
             </StatusChip>
-            <h2 className="mt-2 text-xl font-semibold">
+            <h2
+              id="bulk-roster-dialog-title"
+              className="mt-2 text-xl font-semibold"
+            >
               Bulk Roster Edit
             </h2>
           </div>

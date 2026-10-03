@@ -35,7 +35,9 @@ test("owner manages manual roster metadata, tags, custom fields, and bulk status
       .getByRole("row")
       .filter({ hasText: "OrganizerFlowE2E" });
 
-    await row.getByRole("button", { name: "Tags" }).click();
+    await row
+      .getByRole("button", { name: "Manage tags for OrganizerFlowE2E" })
+      .click();
     dialog = page.locator("dialog[open]");
 
     await dialog.getByLabel("Raid Team").check();
@@ -66,7 +68,9 @@ test("owner manages manual roster metadata, tags, custom fields, and bulk status
 
     await dialog.getByRole("button", { name: "Close" }).click();
 
-    await row.getByRole("button", { name: "Edit" }).click();
+    await row
+      .getByRole("button", { name: "Edit OrganizerFlowE2E" })
+      .click();
     dialog = page.locator("dialog[open]");
 
     await dialog.getByLabel("Discord Name").fill("organizer-e2e");
