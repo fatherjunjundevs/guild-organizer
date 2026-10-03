@@ -125,6 +125,18 @@ Before adding pagination, virtualization, caching layers, or similar complexity:
 3. implement the smallest useful optimization,
 4. measure again.
 
+### Phase 3 Master Roster performance decision
+
+The Master Roster continues to load the complete Guild-scoped roster so search, filters, sorting, reconciliation context, and organizer selection semantics operate on the full data set. The UI renders at most **200 filtered Characters per page** for both desktop and responsive representations.
+
+This decision followed local Desktop Chrome measurement at the current **1,000-row import maximum**:
+
+- before pagination: about 47,390 DOM elements, 1,000 desktop table rows, and roughly 4.1 seconds from reload to visible roster in the diagnostic run,
+- after pagination: about 11,395–11,396 DOM elements, 200 desktop table rows, and roughly 0.88–0.91 seconds from reload to visible roster in isolated repeat runs,
+- post-change client search/filter measurements were roughly 0.28–0.35 seconds in isolated repeat runs.
+
+These are local development measurements used to justify the implementation choice. They are **not** production performance budgets, SLAs, or a claim that performance work is finished.
+
 Eventually measure Core Web Vitals, LCP, INP, CLS, route/server response time, DB query latency, bundle size, mobile-network behavior, large rosters, large Event boards, and multi-organizer usage.
 
 ## Reliability

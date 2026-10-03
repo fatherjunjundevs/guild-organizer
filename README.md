@@ -4,9 +4,11 @@ An unofficial community tool for organizing guild rosters, events, assignments, 
 
 ## Current Development Status
 
-**Official roadmap:** Phase 3 — Master Guild Roster  
+**Official roadmap:** Phase 3 — Master Guild Roster 🟡
 
-**Next checkpoint:** Phase 3.5 — Generic Spreadsheet Import & Mapping ⏳
+**Current checkpoint:** Phase 3.7E — Final Quality Gate & Documentation 🔒
+
+**Next phase after Phase 3 completion:** Phase 4 — Event Template Designer ⏳
 
 Implemented so far includes:
 
@@ -27,6 +29,11 @@ Implemented so far includes:
 - Bulk roster management
 - Guild-specific reusable roster tags
 - Guild-defined custom organizer fields with typed values, roster search/filter integration, and RTNW-safe persistence
+- Generic CSV/XLSX spreadsheet import with mapping, validation, duplicate handling, preview, and transactional apply
+- Explicit Character reconciliation for same-character identity changes without automatic rename guessing
+- Import and reconciliation history for organizer visibility and audit context
+- Responsive roster hardening with loading, empty/error, and accessibility states
+- Measured larger-roster hardening with 200-character render pages while full-roster filtering/sorting remains intact
 - Vitest + Testing Library
 - Playwright end-to-end testing
 - GitHub Actions CI
@@ -41,6 +48,7 @@ The repository keeps the product plan and engineering expectations alongside the
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md)
+- [`docs/PHASE_3_QUALITY_GATE.md`](docs/PHASE_3_QUALITY_GATE.md)
 
 These are authoritative project references and should be updated when product decisions change.
 

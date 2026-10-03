@@ -35,17 +35,25 @@ Completed internal checkpoints:
 - **3.3C** Bulk Roster Management ✅
 - **3.4A** Roster Tags ✅
 - **3.4B** Custom Organizer Fields ✅
-
-Remaining Phase 3 work:
-
-### 3.5 — Generic Spreadsheet Import & Mapping ⏳
-Excel/CSV ingestion, column mapping, auto-detection suggestions, duplicate detection, validation summary, preview, and transactional apply. This remains separate from the strict official RTNW importer.
-
-### 3.6 — Character Reconciliation & Import History ⏳
-Controlled same-character reconciliation for IGN changes, no automatic rename guessing, historical-reference preservation, import history UI, import-run details, and conflict visibility.
+- **3.5** Generic Spreadsheet Import & Mapping ✅
+- **3.6** Character Reconciliation & Import History ✅
 
 ### 3.7 — Phase 3 Integration & Quality Gate 🔒
-Responsive polish, loading/empty/error states, keyboard/accessibility review, larger-roster performance testing, critical E2E roster workflows, authorization regression pass, security review, and documentation update.
+
+Completed quality-gate work:
+
+- Critical roster/auth E2E coverage and authorization regression checks ✅
+- Responsive mobile/tablet roster coverage and explicit route loading state ✅
+- Dialog/control accessible naming and reconciliation form labeling ✅
+- Larger-roster measurement followed by bounded 200-character render pages ✅
+- Local lint, unit, build, E2E, DB lint, DB tests, generated DB type verification, and `git diff --check` ✅
+- Phase 3 documentation/status refresh ✅
+
+Final Phase 3 completion condition:
+
+- Confirm the final documentation checkpoint's clean CI migration replay before changing Phase 3 from 🟡 to ✅.
+
+See [`PHASE_3_QUALITY_GATE.md`](PHASE_3_QUALITY_GATE.md) for evidence and scope boundaries.
 
 ## Phase 4 — Event Template Designer ⏳
 Event Types, reusable templates, optional Area -> Section -> Party -> Slot hierarchy, custom names/seat counts, role requirements, template validation, preview, cloning, and edit rules.
