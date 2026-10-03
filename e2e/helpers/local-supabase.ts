@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { BrowserContext } from "@playwright/test";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
@@ -13,6 +13,13 @@ type LocalSupabaseEnv = {
 };
 
 type OwnerFixture = {
+  guildId: string;
+  cleanup: () => Promise<void>;
+};
+
+type GuildRole = "officer" | "member";
+
+type RoleFixture = {
   guildId: string;
   cleanup: () => Promise<void>;
 };
@@ -60,7 +67,7 @@ function getLocalSupabaseEnv(): LocalSupabaseEnv {
   const publishableKey =
     values.get("PUBLISHABLE_KEY") ?? values.get("ANON_KEY");
   const adminKey =
-    values.get("SECRET_KEY") ?? values.get("SERVICE_ROLE_KEY");
+    values.get("SERVICE_ROLE_KEY") ?? values.get("SECRET_KEY");
 
   if (!apiUrl || !publishableKey || !adminKey) {
     throw new Error(
@@ -110,10 +117,11 @@ async function addSupabaseSessionCookies(
   );
 }
 
-export async function createAuthenticatedOwnerFixture(
-  context: BrowserContext,
-): Promise<OwnerFixture> {
-  const env = getLocalSupabaseEnv();
+async function createConfirmedSession(
+  env: LocalSupabaseEnv,
+  email: string,
+  displayName: string,
+) {
   const admin = createClient(env.apiUrl, env.adminKey, {
     auth: {
       autoRefreshToken: false,
@@ -127,67 +135,94 @@ export async function createAuthenticatedOwnerFixture(
     },
   });
 
+  const { data: createdUser, error: createUserError } =
+    await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      user_metadata: {
+        display_name: displayName,
+      },
+    });
+
+  if (createUserError || !createdUser.user) {
+    throw new Error("Unable to create the E2E account.");
+  }
+
+  const { data: linkData, error: linkError } =
+    await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
+
+  if (linkError || !linkData.properties.hashed_token) {
+    await admin.auth.admin.deleteUser(createdUser.user.id);
+    throw new Error(
+      `Unable to generate E2E auth token: ${
+        linkError?.message ?? "missing token"
+      }`,
+    );
+  }
+
+  const { data: signInData, error: signInError } =
+    await userClient.auth.verifyOtp({
+      type: "email",
+      token_hash: linkData.properties.hashed_token,
+    });
+
+  if (signInError || !signInData.session) {
+    await admin.auth.admin.deleteUser(createdUser.user.id);
+    throw new Error(
+      `Unable to authenticate E2E account: ${
+        signInError?.message ?? "missing session"
+      }`,
+    );
+  }
+
+  return {
+    admin,
+    userClient,
+    userId: createdUser.user.id,
+    session: signInData.session,
+  };
+}
+
+export async function createAuthenticatedOwnerFixture(
+  context: BrowserContext,
+): Promise<OwnerFixture> {
+  const env = getLocalSupabaseEnv();
   const marker = randomUUID();
-  const email = `spreadsheet-e2e-${marker}@example.test`;
+  const email = `owner-e2e-${marker}@example.test`;
+
   let userId: string | null = null;
   let guildId: string | null = null;
+  const cleanupAdmin = createClient(env.apiUrl, env.adminKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
 
   async function cleanupPartial() {
     if (guildId) {
-      await admin.from("guilds").delete().eq("id", guildId);
+      await cleanupAdmin.from("guilds").delete().eq("id", guildId);
     }
 
     if (userId) {
-      await admin.auth.admin.deleteUser(userId);
+      await cleanupAdmin.auth.admin.deleteUser(userId);
     }
   }
 
   try {
-    const { data: createdUser, error: createUserError } =
-      await admin.auth.admin.createUser({
-        email,
-        email_confirm: true,
-        user_metadata: {
-          display_name: "Spreadsheet E2E Owner",
-        },
-      });
+    const account = await createConfirmedSession(
+      env,
+      email,
+      "Roster E2E Owner",
+    );
+    userId = account.userId;
 
-    if (createUserError || !createdUser.user) {
-      throw new Error("Unable to create the E2E owner account.");
-    }
-
-    userId = createdUser.user.id;
-
-    const { data: linkData, error: linkError } =
-      await admin.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-      });
-
-    if (linkError || !linkData.properties.hashed_token) {
-      throw new Error(
-        `Unable to generate E2E auth token: ${
-          linkError?.message ?? "missing token"
-        }`,
-      );
-    }
-
-    const { data: signInData, error: signInError } =
-      await userClient.auth.verifyOtp({
-        type: "email",
-        token_hash: linkData.properties.hashed_token,
-      });
-
-    if (signInError || !signInData.session) {
-      throw new Error(
-        `Unable to authenticate E2E owner: ${
-          signInError?.message ?? "missing session"
-        }`,
-      );
-    }
     const { data: createdGuildId, error: createGuildError } =
-      await userClient.rpc("create_guild", {
-        p_name: `Spreadsheet E2E ${marker.slice(0, 8)}`,
+      await account.userClient.rpc("create_guild", {
+        p_name: `Roster E2E ${marker.slice(0, 8)}`,
       });
 
     if (createGuildError || !createdGuildId) {
@@ -199,11 +234,142 @@ export async function createAuthenticatedOwnerFixture(
     await addSupabaseSessionCookies(
       context,
       env,
-      signInData.session.access_token,
-      signInData.session.refresh_token,
+      account.session.access_token,
+      account.session.refresh_token,
     );
 
-   return {
+    return {
+      guildId: createdGuildId,
+      cleanup: cleanupPartial,
+    };
+  } catch (error) {
+    await cleanupPartial();
+    throw error;
+  }
+}
+
+export async function createAuthenticatedRoleFixture(
+  context: BrowserContext,
+  options: {
+    role: GuildRole;
+    capabilities?: string[];
+  },
+): Promise<RoleFixture> {
+  const env = getLocalSupabaseEnv();
+  const marker = randomUUID();
+
+  let ownerId: string | null = null;
+  let actorId: string | null = null;
+  let guildId: string | null = null;
+  const cleanupAdmin = createClient(env.apiUrl, env.adminKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  });
+
+  async function cleanupPartial() {
+    if (guildId) {
+      await cleanupAdmin.from("guilds").delete().eq("id", guildId);
+    }
+
+    if (actorId) {
+      await cleanupAdmin.auth.admin.deleteUser(actorId);
+    }
+
+    if (ownerId) {
+      await cleanupAdmin.auth.admin.deleteUser(ownerId);
+    }
+  }
+
+  try {
+    const owner = await createConfirmedSession(
+      env,
+      `role-owner-${marker}@example.test`,
+      "Role Fixture Owner",
+    );
+    ownerId = owner.userId;
+
+    const { data: createdGuildId, error: createGuildError } =
+      await owner.userClient.rpc("create_guild", {
+        p_name: `Role E2E ${marker.slice(0, 8)}`,
+      });
+
+    if (createGuildError || !createdGuildId) {
+      throw new Error("Unable to create the role-fixture Guild.");
+    }
+
+    guildId = createdGuildId;
+
+    const actor = await createConfirmedSession(
+      env,
+      `role-actor-${marker}@example.test`,
+      `Role Fixture ${options.role}`,
+    );
+    actorId = actor.userId;
+
+    const tokenDigest = createHash("sha256")
+      .update(`role-fixture-${marker}`)
+      .digest("hex");
+
+    const { error: inviteError } = await owner.userClient.rpc(
+      "create_guild_invite",
+      {
+        p_guild_id: guildId,
+        p_invite_kind:
+          options.role === "member" ? "join_link" : "elevated",
+        p_role: options.role,
+        p_token_digest: tokenDigest,
+        p_expires_at: new Date(
+          Date.now() + 60 * 60 * 1000,
+        ).toISOString(),
+      },
+    );
+
+    if (inviteError) {
+      throw new Error(
+        `Unable to create the role-fixture invite: ${inviteError.message}`,
+      );
+    }
+
+    const { data: membershipId, error: acceptError } =
+      await actor.userClient.rpc("accept_guild_invite", {
+        p_token_digest: tokenDigest,
+        p_generation: 1,
+      });
+
+    if (acceptError || !membershipId) {
+      throw new Error(
+        `Unable to accept the role-fixture invite: ${
+          acceptError?.message ?? "missing membership id"
+        }`,
+      );
+    }
+
+    for (const capabilityKey of options.capabilities ?? []) {
+      const { error: capabilityError } = await owner.userClient.rpc(
+        "grant_officer_capability",
+        {
+          p_membership_id: membershipId,
+          p_capability_key: capabilityKey,
+        },
+      );
+
+      if (capabilityError) {
+        throw new Error(
+          `Unable to grant role-fixture capability "${capabilityKey}": ${capabilityError.message}`,
+        );
+      }
+    }
+
+    await addSupabaseSessionCookies(
+      context,
+      env,
+      actor.session.access_token,
+      actor.session.refresh_token,
+    );
+
+    return {
       guildId: createdGuildId,
       cleanup: cleanupPartial,
     };

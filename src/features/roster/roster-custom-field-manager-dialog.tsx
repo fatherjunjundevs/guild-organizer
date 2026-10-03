@@ -261,6 +261,8 @@ export function RosterCustomFieldManagerDialog({
 
         <div className="p-5 sm:p-6">
           <form onSubmit={createField}>
+            <input type="hidden" name="guildId" value={guildId} />
+
             <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
               <div>
                 <label
