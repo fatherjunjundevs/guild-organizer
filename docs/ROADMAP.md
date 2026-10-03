@@ -20,7 +20,7 @@ Global shell, Event Builder concepts, Master Roster/import concepts, templates, 
 ## Phase 2 — Technical Foundation ✅
 Next.js, TypeScript, Supabase, authentication/session foundation, Guild access, multi-Guild navigation, roles/capabilities, invites, RLS, transactional RPC patterns, migrations/tests, unit/component tests, Playwright, and CI.
 
-## Phase 3 — Master Guild Roster 🟡
+## Phase 3 — Master Guild Roster ✅
 
 Completed internal checkpoints:
 
@@ -38,7 +38,7 @@ Completed internal checkpoints:
 - **3.5** Generic Spreadsheet Import & Mapping ✅
 - **3.6** Character Reconciliation & Import History ✅
 
-### 3.7 — Phase 3 Integration & Quality Gate 🔒
+### 3.7 — Phase 3 Integration & Quality Gate ✅
 
 Completed quality-gate work:
 
@@ -48,10 +48,9 @@ Completed quality-gate work:
 - Larger-roster measurement followed by bounded 200-character render pages ✅
 - Local lint, unit, build, E2E, DB lint, DB tests, generated DB type verification, and `git diff --check` ✅
 - Phase 3 documentation/status refresh ✅
+- GitHub Actions CI #51 passed for documentation checkpoint `dc156b6`, including clean migration replay, quality gates, DB lint/tests, and generated DB type verification ✅
 
-Final Phase 3 completion condition:
-
-- Confirm the final documentation checkpoint's clean CI migration replay before changing Phase 3 from 🟡 to ✅.
+Phase 3 is quality-gated complete.
 
 See [`PHASE_3_QUALITY_GATE.md`](PHASE_3_QUALITY_GATE.md) for evidence and scope boundaries.
 
