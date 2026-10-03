@@ -209,6 +209,216 @@ isOneToOne: false
       referencedColumns: ["guild_id","id"]
     }
                   ]
+                },"event_template_areas": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"guild_id": string,"id": string,"name": string,"sort_order": number,"template_id": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id": string,"id"?: string,"name": string,"sort_order"?: number,"template_id": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"sort_order"?: number,"template_id"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_template_areas_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_template_areas_template_fk"
+      columns: ["guild_id","template_id"]
+isOneToOne: false
+      referencedRelation: "event_templates"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_template_areas_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"event_template_parties": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"guild_id": string,"id": string,"name": string,"section_id": string,"sort_order": number,"template_id": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id": string,"id"?: string,"name": string,"section_id": string,"sort_order"?: number,"template_id": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"section_id"?: string,"sort_order"?: number,"template_id"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_template_parties_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_template_parties_section_fk"
+      columns: ["guild_id","template_id","section_id"]
+isOneToOne: false
+      referencedRelation: "event_template_sections"
+      referencedColumns: ["guild_id","template_id","id"]
+    },{
+      foreignKeyName: "event_template_parties_template_fk"
+      columns: ["guild_id","template_id"]
+isOneToOne: false
+      referencedRelation: "event_templates"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_template_parties_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"event_template_sections": {
+                  Row: {
+                    "area_id": string | null,"created_at": string,"created_by": string | null,"guild_id": string,"id": string,"name": string,"sort_order": number,"template_id": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "area_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"guild_id": string,"id"?: string,"name": string,"sort_order"?: number,"template_id": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "area_id"?: string | null,"created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"sort_order"?: number,"template_id"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_template_sections_area_fk"
+      columns: ["guild_id","template_id","area_id"]
+isOneToOne: false
+      referencedRelation: "event_template_areas"
+      referencedColumns: ["guild_id","template_id","id"]
+    },{
+      foreignKeyName: "event_template_sections_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_template_sections_template_fk"
+      columns: ["guild_id","template_id"]
+isOneToOne: false
+      referencedRelation: "event_templates"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_template_sections_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"event_template_slots": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"guild_id": string,"id": string,"name": string,"party_id": string,"role_label": string | null,"sort_order": number,"template_id": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id": string,"id"?: string,"name": string,"party_id": string,"role_label"?: string | null,"sort_order"?: number,"template_id": string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"party_id"?: string,"role_label"?: string | null,"sort_order"?: number,"template_id"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_template_slots_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_template_slots_party_fk"
+      columns: ["guild_id","template_id","party_id"]
+isOneToOne: false
+      referencedRelation: "event_template_parties"
+      referencedColumns: ["guild_id","template_id","id"]
+    },{
+      foreignKeyName: "event_template_slots_template_fk"
+      columns: ["guild_id","template_id"]
+isOneToOne: false
+      referencedRelation: "event_templates"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_template_slots_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"event_templates": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"description": string | null,"event_type_id": string,"guild_id": string,"id": string,"name": string,"status": string,"updated_at": string,"updated_by": string | null,"uses_areas": boolean
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"event_type_id": string,"guild_id": string,"id"?: string,"name": string,"status"?: string,"updated_at"?: string,"updated_by"?: string | null,"uses_areas"?: boolean
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"event_type_id"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"status"?: string,"updated_at"?: string,"updated_by"?: string | null,"uses_areas"?: boolean
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_templates_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_templates_event_type_fk"
+      columns: ["guild_id","event_type_id"]
+isOneToOne: false
+      referencedRelation: "event_types"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_templates_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_templates_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"event_types": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"description": string | null,"guild_id": string,"id": string,"name": string,"status": string,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"guild_id": string,"id"?: string,"name": string,"status"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"description"?: string | null,"guild_id"?: string,"id"?: string,"name"?: string,"status"?: string,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_types_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_types_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_types_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"guild_invite_acceptances": {
                   Row: {
                     "accepted_at": string,"accepted_role": string,"guild_id": string,"id": string,"invite_generation": number,"invite_id": string,"membership_id": string | null,"user_id": string | null
