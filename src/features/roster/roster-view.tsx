@@ -14,6 +14,7 @@ import {
   formatRosterCustomFieldValue,
   getRosterClassOptions,
   getRosterSummary,
+  paginateRoster,
   type RosterSort,
   type RosterStatusFilter,
 } from "@/features/roster/view-model";
@@ -112,6 +113,7 @@ export function RosterView({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [pageIndex, setPageIndex] = useState(0);
 
   const summary = useMemo(
     () => getRosterSummary(characters),
@@ -169,12 +171,17 @@ export function RosterView({
       sort,
     ],
   );
-  const selectableVisibleCharacters = useMemo(
+  const rosterPage = useMemo(
+    () => paginateRoster(visibleCharacters, pageIndex),
+    [pageIndex, visibleCharacters],
+  );
+  const pagedCharacters = rosterPage.rows;
+  const selectablePageCharacters = useMemo(
     () =>
-      visibleCharacters.filter(
+      pagedCharacters.filter(
         (character) => !character.reconciledIntoCharacterId,
       ),
-    [visibleCharacters],
+    [pagedCharacters],
   );
   const selectedCharacters = useMemo(
     () =>
@@ -185,9 +192,9 @@ export function RosterView({
       ),
     [characters, selectedIds],
   );
-  const allVisibleSelected =
-    selectableVisibleCharacters.length > 0 &&
-    selectableVisibleCharacters.every((character) =>
+  const allPageSelected =
+    selectablePageCharacters.length > 0 &&
+    selectablePageCharacters.every((character) =>
       selectedIds.has(character.id),
     );
 
@@ -213,16 +220,16 @@ export function RosterView({
     });
   }
 
-  function toggleAllVisible() {
+  function toggleCurrentPage() {
     setSelectedIds((current) => {
       const next = new Set(current);
 
-      if (allVisibleSelected) {
-        for (const character of selectableVisibleCharacters) {
+      if (allPageSelected) {
+        for (const character of selectablePageCharacters) {
           next.delete(character.id);
         }
       } else {
-        for (const character of selectableVisibleCharacters) {
+        for (const character of selectablePageCharacters) {
           next.add(character.id);
         }
       }
@@ -297,7 +304,11 @@ export function RosterView({
         </Surface>
       </div>
 
-      <Surface level={2} className="mt-6 p-4 sm:p-5">
+      <Surface
+        level={2}
+        className="mt-6 p-4 sm:p-5"
+        onChangeCapture={() => setPageIndex(0)}
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1fr)_10rem_12rem_12rem_13rem]">
           <div>
             <label
@@ -517,11 +528,24 @@ export function RosterView({
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-subtle)] pt-4">
           <p className="text-sm text-[var(--text-secondary)]">
-            Showing{" "}
-            <span className="font-semibold text-[var(--text-primary)]">
-              {visibleCharacters.length}
-            </span>{" "}
-            of {characters.length} stored characters
+            {rosterPage.pageCount > 1 ? (
+              <>
+                Showing{" "}
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {rosterPage.startIndex + 1}–{rosterPage.endIndex}
+                </span>{" "}
+                of {visibleCharacters.length} matching characters ·{" "}
+                {characters.length} stored
+              </>
+            ) : (
+              <>
+                Showing{" "}
+                <span className="font-semibold text-[var(--text-primary)]">
+                  {visibleCharacters.length}
+                </span>{" "}
+                of {characters.length} stored characters
+              </>
+            )}
             {selectedIds.size > 0 ? (
               <>
                 {" · "}
@@ -533,16 +557,14 @@ export function RosterView({
           </p>
 
           <div className="flex flex-wrap items-center gap-2">
-            {selectableVisibleCharacters.length > 0 ? (
+            {selectablePageCharacters.length > 0 ? (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={toggleAllVisible}
+                onClick={toggleCurrentPage}
               >
-                {allVisibleSelected
-                  ? "Clear shown"
-                  : "Select all shown"}
+                {allPageSelected ? "Clear page" : "Select page"}
               </Button>
             ) : null}
 
@@ -559,6 +581,58 @@ export function RosterView({
           </div>
         </div>
       </Surface>
+
+      {rosterPage.pageCount > 1 ? (
+        <nav
+          aria-label="Roster pages"
+          className="mt-4 flex flex-wrap items-center justify-between gap-3"
+        >
+          <p
+            className="text-sm text-[var(--text-secondary)]"
+            aria-live="polite"
+          >
+            Page{" "}
+            <span className="font-semibold text-[var(--text-primary)]">
+              {rosterPage.pageIndex + 1}
+            </span>{" "}
+            of {rosterPage.pageCount}
+          </p>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={rosterPage.pageIndex === 0}
+              onClick={() =>
+                setPageIndex(
+                  Math.max(0, rosterPage.pageIndex - 1),
+                )
+              }
+            >
+              Previous
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={
+                rosterPage.pageIndex >= rosterPage.pageCount - 1
+              }
+              onClick={() =>
+                setPageIndex(
+                  Math.min(
+                    rosterPage.pageCount - 1,
+                    rosterPage.pageIndex + 1,
+                  ),
+                )
+              }
+            >
+              Next
+            </Button>
+          </div>
+        </nav>
+      ) : null}
 
       {selectedCharacters.length > 0 ? (
         <Surface
@@ -620,7 +694,7 @@ export function RosterView({
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleCharacters.map((character) => (
+                  {pagedCharacters.map((character) => (
                     <tr
                       key={character.id}
                       className="border-t border-[var(--border-subtle)]"
@@ -737,7 +811,7 @@ export function RosterView({
           </Surface>
 
           <div className="mt-4 space-y-3 xl:hidden">
-            {visibleCharacters.map((character) => (
+            {pagedCharacters.map((character) => (
               <Surface key={character.id} level={2} className="p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">

@@ -31,6 +31,31 @@ export type RosterViewOptions = {
   sort: RosterSort;
 };
 
+export const ROSTER_PAGE_SIZE = 200;
+
+export function paginateRoster<T>(
+  rows: T[],
+  requestedPageIndex: number,
+  pageSize = ROSTER_PAGE_SIZE,
+) {
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const pageCount = Math.max(1, Math.ceil(rows.length / safePageSize));
+  const pageIndex = Math.min(
+    Math.max(0, Math.floor(requestedPageIndex)),
+    pageCount - 1,
+  );
+  const startIndex = pageIndex * safePageSize;
+  const endIndex = Math.min(startIndex + safePageSize, rows.length);
+
+  return {
+    pageIndex,
+    pageCount,
+    startIndex,
+    endIndex,
+    rows: rows.slice(startIndex, endIndex),
+  };
+}
+
 const GUILD_POSITION_HIERARCHY: Record<string, number> = {
   emperor: 0,
   chancellor: 1,

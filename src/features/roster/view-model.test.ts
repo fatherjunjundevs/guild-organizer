@@ -7,6 +7,7 @@ import {
   filterAndSortRoster,
   getRosterClassOptions,
   getRosterSummary,
+  paginateRoster,
 } from "@/features/roster/view-model";
 
 const customFields: MasterRosterCustomField[] = [
@@ -153,6 +154,29 @@ const baseOptions = {
 };
 
 describe("roster view model", () => {
+  it("paginates large result sets and clamps invalid page indexes", () => {
+    const values = Array.from({ length: 450 }, (_, index) => index + 1);
+
+    expect(paginateRoster(values, 0)).toMatchObject({
+      pageIndex: 0,
+      pageCount: 3,
+      startIndex: 0,
+      endIndex: 200,
+    });
+    expect(paginateRoster(values, 0).rows).toHaveLength(200);
+
+    expect(paginateRoster(values, 2)).toMatchObject({
+      pageIndex: 2,
+      pageCount: 3,
+      startIndex: 400,
+      endIndex: 450,
+    });
+    expect(paginateRoster(values, 2).rows).toHaveLength(50);
+
+    expect(paginateRoster(values, 99).pageIndex).toBe(2);
+    expect(paginateRoster(values, -5).pageIndex).toBe(0);
+  });
+
   it("summarizes active, left, and manually inactive characters", () => {
     expect(getRosterSummary(rows)).toEqual({
       total: 4,
