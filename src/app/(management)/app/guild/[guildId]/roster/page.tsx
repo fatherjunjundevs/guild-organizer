@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
 import { AddCharacterDialog } from "@/features/roster/add-character-dialog";
 import { GenericSpreadsheetImportDialog } from "@/features/roster/generic-spreadsheet-import-dialog";
+import { ImportHistoryDialog } from "@/features/roster/import-history-dialog";
 import { getGuildAccess } from "@/features/guilds/server";
 import { RosterCustomFieldManagerDialog } from "@/features/roster/roster-custom-field-manager-dialog";
 import { RosterTagManagerDialog } from "@/features/roster/roster-tag-manager-dialog";
 import { RtnwImportDialog } from "@/features/roster/rtnw-import-dialog";
 import { RosterView } from "@/features/roster/roster-view";
-import { loadMasterRoster } from "@/features/roster/server";
+import {
+  loadMasterRoster,
+  loadRosterImportHistory,
+} from "@/features/roster/server";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 
@@ -66,6 +70,8 @@ export default async function GuildRosterPage({
     );
   }
 
+  const importHistory = await loadRosterImportHistory(access);
+
   return (
     <div className="px-5 py-8 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-[90rem]">
@@ -83,6 +89,14 @@ export default async function GuildRosterPage({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {importHistory.status === "ready" ? (
+              <ImportHistoryDialog
+                guildId={access.guildId}
+                runs={importHistory.runs}
+              />
+            ) : importHistory.status === "error" ? (
+              <StatusChip tone="warning">History unavailable</StatusChip>
+            ) : null}
             <RosterCustomFieldManagerDialog
               guildId={access.guildId}
               fields={roster.customFields}

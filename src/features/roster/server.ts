@@ -5,6 +5,7 @@ import type {
   RosterCustomFieldType,
   RosterCustomFieldValue,
 } from "@/features/roster/custom-fields";
+import type { RosterImportRunSummary } from "@/features/roster/import-history";
 import { createClient } from "@/lib/supabase/server";
 
 export type MasterRosterTag = {
@@ -87,6 +88,43 @@ async function canManageRoster(
   }
 
   return data ? "allowed" : "forbidden";
+}
+
+export type RosterImportHistoryLoadResult =
+  | {
+      status: "ready";
+      runs: RosterImportRunSummary[];
+    }
+  | {
+      status: "forbidden" | "error";
+      runs: [];
+    };
+
+async function canViewRosterImportHistory(
+  access: GuildAccess,
+): Promise<"allowed" | "forbidden" | "error"> {
+  if (access.role === "owner" || access.role === "admin") {
+    return "allowed";
+  }
+
+  if (access.role !== "officer") {
+    return "forbidden";
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("guild_officer_capabilities")
+    .select("capability_key")
+    .eq("guild_id", access.guildId)
+    .eq("membership_id", access.membershipId)
+    .in("capability_key", ["imports.manage", "audit.view"])
+    .limit(1);
+
+  if (error) {
+    return "error";
+  }
+
+  return data && data.length > 0 ? "allowed" : "forbidden";
 }
 
 export async function loadMasterRoster(
@@ -252,5 +290,77 @@ export async function loadMasterRoster(
           customFieldValuesByCharacter.get(character.id) ?? {},
       };
     }),
+  };
+}
+
+export async function loadRosterImportHistory(
+  access: GuildAccess,
+): Promise<RosterImportHistoryLoadResult> {
+  const authorization = await canViewRosterImportHistory(access);
+
+  if (authorization !== "allowed") {
+    return {
+      status: authorization,
+      runs: [],
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: runs, error: runsError } = await supabase
+    .from("roster_sync_runs")
+    .select(
+      "id,source_type,source_filename,source_row_count,created_count,updated_count,reactivated_count,left_guild_count,unchanged_count,imported_by,applied_at",
+    )
+    .eq("guild_id", access.guildId)
+    .order("applied_at", { ascending: false })
+    .limit(25);
+
+  if (runsError) {
+    return {
+      status: "error",
+      runs: [],
+    };
+  }
+
+  const importedByIds = [
+    ...new Set(
+      (runs ?? [])
+        .map((run) => run.imported_by)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+
+  const displayNames = new Map<string, string>();
+
+  if (importedByIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id,display_name")
+      .in("id", importedByIds);
+
+    for (const profile of profiles ?? []) {
+      if (profile.display_name) {
+        displayNames.set(profile.id, profile.display_name);
+      }
+    }
+  }
+
+  return {
+    status: "ready",
+    runs: (runs ?? []).map((run) => ({
+      id: run.id,
+      sourceType: run.source_type,
+      sourceFilename: run.source_filename,
+      sourceRowCount: run.source_row_count,
+      createdCount: run.created_count,
+      updatedCount: run.updated_count,
+      reactivatedCount: run.reactivated_count,
+      leftGuildCount: run.left_guild_count,
+      unchangedCount: run.unchanged_count,
+      importedByName: run.imported_by
+        ? displayNames.get(run.imported_by) ?? "Organizer"
+        : null,
+      appliedAt: run.applied_at,
+    })),
   };
 }
