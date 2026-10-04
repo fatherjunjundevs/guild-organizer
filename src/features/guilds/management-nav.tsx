@@ -8,7 +8,7 @@ type ManagementNavProps = {
   guildId: string;
 };
 
-const futureItems = ["Events", "Templates", "History", "Settings"];
+const futureItems = ["Events", "History", "Settings"];
 
 export function ManagementNav({ guildId }: ManagementNavProps) {
   const pathname = usePathname();
@@ -21,6 +21,10 @@ export function ManagementNav({ guildId }: ManagementNavProps) {
     {
       label: "Roster",
       href: `/app/guild/${guildId}/roster`,
+    },
+    {
+      label: "Templates",
+      href: `/app/guild/${guildId}/templates`,
     },
   ];
 
