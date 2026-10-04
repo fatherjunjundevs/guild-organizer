@@ -684,6 +684,9 @@ isOneToOne: false
             "accept_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: string
                            },
+"activate_event_template":
+{ Args: { "p_template_id": string }; Returns: undefined
+                           },
 "apply_generic_roster_import":
 { Args: { "p_guild_id": string,"p_mapped_fields": (string)[],"p_rows": Json,"p_source_filename": string,"p_source_sha256": string }; Returns: {
               "created_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
@@ -753,6 +756,11 @@ isOneToOne: false
                            },
 "delete_roster_tag":
 { Args: { "p_tag_id": string }; Returns: undefined
+                           },
+"get_event_template_preview":
+{ Args: { "p_template_id": string }; Returns: {
+              "area_id": string,"area_name": string,"area_sort_order": number,"event_type_id": string,"event_type_name": string,"party_id": string,"party_name": string,"party_sort_order": number,"role_label": string,"section_id": string,"section_name": string,"section_sort_order": number,"slot_id": string,"slot_name": string,"slot_sort_order": number,"template_description": string,"template_id": string,"template_name": string,"template_status": string,"uses_areas": boolean
+            }[]
                            },
 "grant_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
@@ -836,6 +844,11 @@ isOneToOne: false
                            },
 "update_roster_custom_field":
 { Args: { "p_field_id": string,"p_name": string,"p_select_options"?: (string)[] }; Returns: undefined
+                           },
+"validate_event_template":
+{ Args: { "p_template_id": string }; Returns: {
+              "entity_id": string,"entity_type": string,"issue_code": string,"message": string,"severity": string
+            }[]
                            }
           }
           Enums: {
