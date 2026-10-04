@@ -795,6 +795,12 @@ isOneToOne: false
 "rename_roster_tag":
 { Args: { "p_name": string,"p_tag_id": string }; Returns: undefined
                            },
+"reorder_event_template_parties":
+{ Args: { "p_ordered_party_ids": (string)[],"p_section_id": string }; Returns: undefined
+                           },
+"reorder_event_template_teams":
+{ Args: { "p_area_id": string,"p_ordered_section_ids": (string)[],"p_template_id": string }; Returns: undefined
+                           },
 "resolve_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: {
               "expires_at": string,"generation": number,"guild_id": string,"guild_name": string,"invite_id": string,"invite_kind": string,"invite_role": string

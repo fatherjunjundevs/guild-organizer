@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTemplateStructureTree,
+  moveOrderedId,
+  reorderOrderedIdsToTarget,
   parseTeamPartyCount,
   parseTemplateSlotRoleLabel,
   parseTemplateStructureName,
@@ -55,6 +57,46 @@ describe("Template structure input", () => {
     expect(parseTeamPartyCount("0").ok).toBe(false);
     expect(parseTeamPartyCount("9").ok).toBe(false);
     expect(parseTeamPartyCount("4.5").ok).toBe(false);
+  });
+});
+
+describe("Template ordering helpers", () => {
+  it("moves an item one position in either direction", () => {
+    expect(moveOrderedId(["A", "B", "C"], "B", -1)).toEqual([
+      "B",
+      "A",
+      "C",
+    ]);
+    expect(moveOrderedId(["A", "B", "C"], "B", 1)).toEqual([
+      "A",
+      "C",
+      "B",
+    ]);
+  });
+
+  it("leaves boundary and unknown moves unchanged", () => {
+    expect(moveOrderedId(["A", "B"], "A", -1)).toEqual(["A", "B"]);
+    expect(moveOrderedId(["A", "B"], "B", 1)).toEqual(["A", "B"]);
+    expect(moveOrderedId(["A", "B"], "X", 1)).toEqual(["A", "B"]);
+  });
+
+  it("moves a dragged item to the target position", () => {
+    expect(
+      reorderOrderedIdsToTarget(["A", "B", "C", "D"], "A", "D"),
+    ).toEqual(["B", "C", "D", "A"]);
+
+    expect(
+      reorderOrderedIdsToTarget(["A", "B", "C", "D"], "D", "A"),
+    ).toEqual(["D", "A", "B", "C"]);
+  });
+
+  it("leaves invalid or same-target drags unchanged", () => {
+    expect(
+      reorderOrderedIdsToTarget(["A", "B"], "A", "A"),
+    ).toEqual(["A", "B"]);
+    expect(
+      reorderOrderedIdsToTarget(["A", "B"], "X", "A"),
+    ).toEqual(["A", "B"]);
   });
 });
 

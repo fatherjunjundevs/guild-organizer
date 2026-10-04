@@ -26,6 +26,23 @@ function getUuid(formData: FormData, key: string) {
   return UUID_PATTERN.test(value) ? value : null;
 }
 
+function getUuidList(formData: FormData, key: string) {
+  const values = formData.getAll(key);
+
+  if (values.length < 1) return null;
+
+  const ids: string[] = [];
+
+  for (const value of values) {
+    if (typeof value !== "string" || !UUID_PATTERN.test(value)) {
+      return null;
+    }
+    ids.push(value);
+  }
+
+  return ids;
+}
+
 function getOptionalUuid(formData: FormData, key: string) {
   const value = getString(formData, key);
 
@@ -428,6 +445,83 @@ export async function updateTemplateSeatRoleAction(
       ? `Seat role set to ${roleLabel.value}.`
       : "Seat role requirement cleared.",
     id: slotId,
+  };
+}
+
+export async function reorderTemplateTeamsAction(
+  formData: FormData,
+): Promise<TemplateStructureMutationResult> {
+  const scope = validateScope(formData);
+  const areaId = getOptionalUuid(formData, "areaId");
+  const orderedIds = getUuidList(formData, "orderedIds");
+
+  if (!scope || areaId === undefined || !orderedIds) {
+    return {
+      ok: false,
+      message: "The Team ordering payload is invalid.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "reorder_event_template_teams",
+    {
+      p_template_id: scope.templateId,
+      p_area_id: areaId as unknown as string,
+      p_ordered_section_ids: orderedIds,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      message: mapStructureRpcError(error.code),
+    };
+  }
+
+  revalidateTemplatePaths(scope.guildId, scope.templateId);
+
+  return {
+    ok: true,
+    message: "Team order updated.",
+  };
+}
+
+export async function reorderTemplatePartiesAction(
+  formData: FormData,
+): Promise<TemplateStructureMutationResult> {
+  const scope = validateScope(formData);
+  const sectionId = getUuid(formData, "sectionId");
+  const orderedIds = getUuidList(formData, "orderedIds");
+
+  if (!scope || !sectionId || !orderedIds) {
+    return {
+      ok: false,
+      message: "The Party ordering payload is invalid.",
+    };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc(
+    "reorder_event_template_parties",
+    {
+      p_section_id: sectionId,
+      p_ordered_party_ids: orderedIds,
+    },
+  );
+
+  if (error) {
+    return {
+      ok: false,
+      message: mapStructureRpcError(error.code),
+    };
+  }
+
+  revalidateTemplatePaths(scope.guildId, scope.templateId);
+
+  return {
+    ok: true,
+    message: "Party order updated.",
   };
 }
 

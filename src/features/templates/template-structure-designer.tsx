@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
@@ -13,6 +14,8 @@ import {
   deleteTemplateAreaAction,
   deleteTemplatePartyAction,
   deleteTemplateTeamAction,
+  reorderTemplatePartiesAction,
+  reorderTemplateTeamsAction,
   updateTemplateAreaAction,
   updateTemplatePartyAction,
   updateTemplateSeatRoleAction,
@@ -23,6 +26,7 @@ import type { TemplateStructureSummary } from "@/features/templates/structure-se
 import {
   PARTY_SEAT_COUNT,
   TEAM_MAX_PARTIES,
+  moveOrderedId,
   type TemplateAreaNode,
   type TemplatePartyNode,
   type TemplateSectionNode,
@@ -82,6 +86,50 @@ type DeleteTarget = {
   detail: string;
 };
 
+type DragItem = {
+  kind: "team" | "party";
+  id: string;
+  parentId: string | null;
+};
+
+function swapOrderedIds(ids: string[], sourceId: string, targetId: string) {
+  const sourceIndex = ids.indexOf(sourceId);
+  const targetIndex = ids.indexOf(targetId);
+
+  if (
+    sourceIndex < 0 ||
+    targetIndex < 0 ||
+    sourceIndex === targetIndex
+  ) {
+    return ids;
+  }
+
+  const next = [...ids];
+  [next[sourceIndex], next[targetIndex]] = [
+    next[targetIndex],
+    next[sourceIndex],
+  ];
+  return next;
+}
+
+function orderNodesByIds<T extends { id: string }>(
+  nodes: T[],
+  orderedIds: string[] | undefined,
+) {
+  if (!orderedIds) return nodes;
+
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  const ordered = orderedIds
+    .map((id) => byId.get(id))
+    .filter((node): node is T => Boolean(node));
+  const orderedIdSet = new Set(ordered.map((node) => node.id));
+
+  return [
+    ...ordered,
+    ...nodes.filter((node) => !orderedIdSet.has(node.id)),
+  ];
+}
+
 function statusTone(status: TemplateStructureSummary["status"]) {
   if (status === "active") return "success" as const;
   if (status === "draft") return "warning" as const;
@@ -125,16 +173,230 @@ export function TemplateStructureDesigner({
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [pendingDelete, setPendingDelete] =
     useState<DeleteTarget | null>(null);
+  const [dragItem, setDragItem] = useState<DragItem | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<DragItem | null>(null);
+  const dragOverItemRef = useRef<DragItem | null>(null);
+  const dragPreviewRef = useRef<HTMLElement | null>(null);
+  const dragPointerOffsetRef = useRef({ x: 0, y: 0 });
+  const dragSourceRectRef = useRef<DOMRect | null>(null);
+  const dragCandidateRectsRef = useRef<
+    Array<{ id: string; parentId: string; rect: DOMRect }>
+  >([]);
+  const dragBodyStyleRef = useRef<{ userSelect: string; cursor: string } | null>(null);
+  const [dragSwapOffset, setDragSwapOffset] = useState({ x: 0, y: 0 });
+  const [teamOrderOverrides, setTeamOrderOverrides] = useState<Record<string, string[]>>({});
+  const [partyOrderOverrides, setPartyOrderOverrides] = useState<Record<string, string[]>>({});
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
   const readOnly = template.status === "archived";
+  const reorderBusy = busyKey.startsWith("reorder-");
   const structureCount =
     template.areaCount +
     template.sectionCount +
     template.partyCount +
     template.slotCount;
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setTeamOrderOverrides((current) =>
+        Object.keys(current).length === 0 ? current : {},
+      );
+      setPartyOrderOverrides((current) =>
+        Object.keys(current).length === 0 ? current : {},
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [template.tree]);
+
+  // Phase 4.2B2 no button blink v2.4
+  // Phase 4.2B2 drop settle v2.3
+  function dragParentKey(parentId: string | null) {
+    return parentId ?? "__root__";
+  }
+
+  function setCurrentDragOver(
+    next: DragItem | null,
+    offset = { x: 0, y: 0 },
+  ) {
+    const current = dragOverItemRef.current;
+    if (
+      current?.kind === next?.kind &&
+      current?.id === next?.id &&
+      current?.parentId === next?.parentId &&
+      dragSwapOffset.x === offset.x &&
+      dragSwapOffset.y === offset.y
+    ) {
+      return;
+    }
+
+    dragOverItemRef.current = next;
+    setDragOverItem(next);
+    setDragSwapOffset(offset);
+  }
+
+  function removePointerDragPreview() {
+    dragPreviewRef.current?.remove();
+    dragPreviewRef.current = null;
+    dragSourceRectRef.current = null;
+    dragCandidateRectsRef.current = [];
+    setDragSwapOffset({ x: 0, y: 0 });
+
+    if (dragBodyStyleRef.current) {
+      document.body.style.userSelect = dragBodyStyleRef.current.userSelect;
+      document.body.style.cursor = dragBodyStyleRef.current.cursor;
+      dragBodyStyleRef.current = null;
+    }
+  }
+
+  function clearPointerDrag() {
+    removePointerDragPreview();
+    dragOverItemRef.current = null;
+    setDragOverItem(null);
+    setDragItem(null);
+  }
+
+  function beginPointerDrag(
+    event: React.PointerEvent<HTMLButtonElement>,
+    item: DragItem,
+    selector: string,
+  ) {
+    if (event.button !== 0 || busyKey !== "") return;
+
+    const source = event.currentTarget.closest(selector) as HTMLElement | null;
+    if (!source) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const rect = source.getBoundingClientRect();
+    const idAttribute =
+      item.kind === "team" ? "data-team-id" : "data-party-id";
+    const parentAttribute =
+      item.kind === "team"
+        ? "data-team-parent-id"
+        : "data-party-parent-id";
+
+    dragSourceRectRef.current = rect;
+    dragCandidateRectsRef.current = Array.from(
+      document.querySelectorAll<HTMLElement>(selector),
+    )
+      .map((element) => ({
+        id: element.getAttribute(idAttribute) ?? "",
+        parentId: element.getAttribute(parentAttribute) ?? "",
+        rect: element.getBoundingClientRect(),
+      }))
+      .filter((candidate) => candidate.id.length > 0);
+
+    const preview = source.cloneNode(true) as HTMLElement;
+    preview.setAttribute("aria-hidden", "true");
+    preview.style.position = "fixed";
+    preview.style.left = `${rect.left}px`;
+    preview.style.top = `${rect.top}px`;
+    preview.style.width = `${rect.width}px`;
+    preview.style.height = `${rect.height}px`;
+    preview.style.margin = "0";
+    preview.style.pointerEvents = "none";
+    preview.style.opacity = "0.97";
+    preview.style.transform = "scale(1.01) rotate(0.15deg)";
+    preview.style.transformOrigin = "center";
+    preview.style.boxShadow = "0 28px 70px rgba(0, 0, 0, 0.46)";
+    preview.style.zIndex = "9999";
+    preview.style.willChange = "left, top";
+
+    document.body.appendChild(preview);
+    dragPreviewRef.current = preview;
+    dragPointerOffsetRef.current = {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    };
+    dragBodyStyleRef.current = {
+      userSelect: document.body.style.userSelect,
+      cursor: document.body.style.cursor,
+    };
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "grabbing";
+
+    dragOverItemRef.current = null;
+    setDragOverItem(null);
+    setDragItem(item);
+  }
+
+  function movePointerDrag(
+    event: React.PointerEvent<HTMLButtonElement>,
+    item: DragItem,
+  ) {
+    const preview = dragPreviewRef.current;
+    if (!preview) return;
+
+    event.preventDefault();
+    const offset = dragPointerOffsetRef.current;
+    preview.style.left = `${event.clientX - offset.x}px`;
+    preview.style.top = `${event.clientY - offset.y}px`;
+
+    const expectedParentId = item.parentId ?? "";
+    const candidate = dragCandidateRectsRef.current.find(({ id, parentId, rect }) =>
+      id !== item.id &&
+      parentId === expectedParentId &&
+      event.clientX >= rect.left &&
+      event.clientX <= rect.right &&
+      event.clientY >= rect.top &&
+      event.clientY <= rect.bottom,
+    );
+    const sourceRect = dragSourceRectRef.current;
+
+    if (!candidate || !sourceRect) {
+      setCurrentDragOver(null);
+      return;
+    }
+
+    setCurrentDragOver(
+      {
+        kind: item.kind,
+        id: candidate.id,
+        parentId: item.parentId,
+      },
+      {
+        x: sourceRect.left - candidate.rect.left,
+        y: sourceRect.top - candidate.rect.top,
+      },
+    );
+  }
+
+  function releasePointerCapture(
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function animateSettledCard(kind: DragItem["kind"], id: string) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    window.requestAnimationFrame(() => {
+      const selector =
+        kind === "team" ? "[data-team-drag-card]" : "[data-party-drag-card]";
+      const idAttribute =
+        kind === "team" ? "data-team-id" : "data-party-id";
+      const element = Array.from(
+        document.querySelectorAll<HTMLElement>(selector),
+      ).find((candidate) => candidate.getAttribute(idAttribute) === id);
+
+      element?.animate(
+        [
+          { boxShadow: "0 0 0 1px var(--guild-accent)" },
+          { boxShadow: "0 0 0 0 transparent" },
+        ],
+        {
+          duration: 120,
+          easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        },
+      );
+    });
+  }
 
   function clearMessage() {
     setMessage("");
@@ -370,6 +632,111 @@ export function TemplateStructureDesigner({
     }
   }
 
+  function appendOrderedIds(data: FormData, ids: string[]) {
+    for (const id of ids) {
+      data.append("orderedIds", id);
+    }
+  }
+
+  function teamSiblingIds(team: TemplateSectionNode) {
+    if (!team.areaId) {
+      return template.tree.rootSections.map((sibling) => sibling.id);
+    }
+
+    return (
+      template.tree.areas
+        .find((area) => area.id === team.areaId)
+        ?.sections.map((sibling) => sibling.id) ?? []
+    );
+  }
+
+  async function persistTeamOrder(
+    team: TemplateSectionNode,
+    orderedIds: string[],
+    refreshAfterSave = true,
+  ) {
+    const data = new FormData();
+    data.set("guildId", guildId);
+    data.set("templateId", template.id);
+    data.set("areaId", team.areaId ?? "");
+    appendOrderedIds(data, orderedIds);
+
+    setBusyKey(`reorder-team:${team.id}`);
+    clearMessage();
+
+    const result = await reorderTemplateTeamsAction(data);
+
+    setBusyKey("");
+    setDragItem(null);
+
+    if (!result.ok) {
+      applyResult(result);
+      return false;
+    }
+
+    if (refreshAfterSave) {
+      router.refresh();
+    }
+
+    return true;
+  }
+
+  async function moveTeam(team: TemplateSectionNode, offset: number) {
+    const parentKey = dragParentKey(team.areaId);
+    const serverIds = teamSiblingIds(team);
+    const currentIds = teamOrderOverrides[parentKey] ?? serverIds;
+    const orderedIds = moveOrderedId(currentIds, team.id, offset);
+
+    if (orderedIds.join("|") === currentIds.join("|")) return;
+
+    await persistTeamOrder(team, orderedIds);
+  }
+
+  async function persistPartyOrder(
+    team: TemplateSectionNode,
+    orderedIds: string[],
+    refreshAfterSave = true,
+  ) {
+    const data = new FormData();
+    data.set("guildId", guildId);
+    data.set("templateId", template.id);
+    data.set("sectionId", team.id);
+    appendOrderedIds(data, orderedIds);
+
+    setBusyKey(`reorder-party:${team.id}`);
+    clearMessage();
+
+    const result = await reorderTemplatePartiesAction(data);
+
+    setBusyKey("");
+    setDragItem(null);
+
+    if (!result.ok) {
+      applyResult(result);
+      return false;
+    }
+
+    if (refreshAfterSave) {
+      router.refresh();
+    }
+
+    return true;
+  }
+
+  async function moveParty(
+    team: TemplateSectionNode,
+    party: TemplatePartyNode,
+    offset: number,
+  ) {
+    const serverIds = team.parties.map((sibling) => sibling.id);
+    const currentIds = partyOrderOverrides[team.id] ?? serverIds;
+    const orderedIds = moveOrderedId(currentIds, party.id, offset);
+
+    if (orderedIds.join("|") === currentIds.join("|")) return;
+
+    await persistPartyOrder(team, orderedIds);
+  }
+
   async function confirmDelete() {
     if (!pendingDelete) return;
 
@@ -406,6 +773,142 @@ export function TemplateStructureDesigner({
     router.refresh();
   }
 
+  function teamsForRender(
+    teams: TemplateSectionNode[],
+    parentId: string | null,
+  ) {
+    const parentKey = dragParentKey(parentId);
+    return orderNodesByIds(teams, teamOrderOverrides[parentKey]);
+  }
+
+  function partiesForRender(team: TemplateSectionNode) {
+    return orderNodesByIds(
+      team.parties,
+      partyOrderOverrides[team.id],
+    );
+  }
+
+  function finishTeamPointerDrag(
+    event: React.PointerEvent<HTMLButtonElement>,
+    team: TemplateSectionNode,
+  ) {
+    event.preventDefault();
+    movePointerDrag(event, {
+      kind: "team",
+      id: team.id,
+      parentId: team.areaId,
+    });
+    releasePointerCapture(event);
+
+    const target = dragOverItemRef.current;
+    const parentKey = dragParentKey(team.areaId);
+    const serverIds = teamSiblingIds(team);
+    const currentIds = teamOrderOverrides[parentKey] ?? serverIds;
+    const orderedIds =
+      target?.kind === "team" && target.parentId === team.areaId
+        ? swapOrderedIds(currentIds, team.id, target.id)
+        : currentIds;
+
+    removePointerDragPreview();
+
+    if (orderedIds.join("|") === currentIds.join("|")) {
+      dragOverItemRef.current = null;
+      setDragOverItem(null);
+      setDragItem(null);
+      return;
+    }
+
+    const previousOverride = teamOrderOverrides[parentKey];
+    flushSync(() => {
+      setTeamOrderOverrides((current) => ({
+        ...current,
+        [parentKey]: orderedIds,
+      }));
+      dragOverItemRef.current = null;
+      setDragOverItem(null);
+      setDragItem(null);
+    });
+    animateSettledCard("team", team.id);
+
+    void persistTeamOrder(
+      team,
+      orderedIds,
+      template.status === "active",
+    ).then((ok) => {
+      if (ok) return;
+      setTeamOrderOverrides((current) => {
+        const next = { ...current };
+        if (previousOverride) next[parentKey] = previousOverride;
+        else delete next[parentKey];
+        return next;
+      });
+    });
+  }
+
+  function finishPartyPointerDrag(
+    event: React.PointerEvent<HTMLButtonElement>,
+    team: TemplateSectionNode,
+    party: TemplatePartyNode,
+  ) {
+    event.preventDefault();
+    movePointerDrag(event, {
+      kind: "party",
+      id: party.id,
+      parentId: team.id,
+    });
+    releasePointerCapture(event);
+
+    const target = dragOverItemRef.current;
+    const serverIds = team.parties.map((sibling) => sibling.id);
+    const currentIds = partyOrderOverrides[team.id] ?? serverIds;
+    const orderedIds =
+      target?.kind === "party" && target.parentId === team.id
+        ? swapOrderedIds(currentIds, party.id, target.id)
+        : currentIds;
+
+    removePointerDragPreview();
+
+    if (orderedIds.join("|") === currentIds.join("|")) {
+      dragOverItemRef.current = null;
+      setDragOverItem(null);
+      setDragItem(null);
+      return;
+    }
+
+    const previousOverride = partyOrderOverrides[team.id];
+    flushSync(() => {
+      setPartyOrderOverrides((current) => ({
+        ...current,
+        [team.id]: orderedIds,
+      }));
+      dragOverItemRef.current = null;
+      setDragOverItem(null);
+      setDragItem(null);
+    });
+    animateSettledCard("party", party.id);
+
+    void persistPartyOrder(
+      team,
+      orderedIds,
+      template.status === "active",
+    ).then((ok) => {
+      if (ok) return;
+      setPartyOrderOverrides((current) => {
+        const next = { ...current };
+        if (previousOverride) next[team.id] = previousOverride;
+        else delete next[team.id];
+        return next;
+      });
+    });
+  }
+
+  function cancelPointerDrag(
+    event: React.PointerEvent<HTMLButtonElement>,
+  ) {
+    releasePointerCapture(event);
+    clearPointerDrag();
+  }
+
   function renderSeat(seat: TemplateSlotNode, partyId: string) {
     return (
       <button
@@ -425,14 +928,44 @@ export function TemplateStructureDesigner({
     );
   }
 
-  function renderParty(party: TemplatePartyNode) {
+  function renderParty(
+    party: TemplatePartyNode,
+    team: TemplateSectionNode,
+  ) {
     const seatCountCorrect = party.slots.length === PARTY_SEAT_COUNT;
+    const partyIndex = team.parties.findIndex(
+      (sibling) => sibling.id === party.id,
+    );
 
     return (
       <div
         key={party.id}
-        className="w-44 shrink-0 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-2)] p-3"
+        data-party-drag-card
+        data-party-id={party.id}
+        data-party-parent-id={team.id}
+        style={
+          dragOverItem?.kind === "party" && dragOverItem.id === party.id
+            ? {
+                transform: `translate3d(${dragSwapOffset.x}px, ${dragSwapOffset.y}px, 0)`,
+                zIndex: 30,
+              }
+            : undefined
+        }
+        className={`relative w-44 shrink-0 rounded-[var(--radius-lg)] border bg-[var(--surface-2)] p-3 transition-[border-color,box-shadow,transform] duration-150 ${
+          dragItem?.kind === "party" && dragItem.id === party.id
+            ? "border-dashed border-[var(--guild-accent)]"
+            : dragOverItem?.kind === "party" && dragOverItem.id === party.id
+              ? "border-[var(--guild-accent)] ring-1 ring-[var(--guild-accent)] shadow-lg"
+              : "border-[var(--border-default)]"
+        }`}
       >
+        {dragItem?.kind === "party" && dragItem.id === party.id ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--guild-accent)] bg-[var(--surface-2)]">
+            <span className="text-[11px] font-semibold text-[var(--text-tertiary)]">
+              Drop here
+            </span>
+          </div>
+        ) : null}
         <div className="min-w-0">
           <p
             className="truncate text-sm font-semibold"
@@ -446,17 +979,78 @@ export function TemplateStructureDesigner({
         </div>
 
         {!readOnly ? (
-          <div className="mt-2 flex items-center gap-1 border-t border-[var(--border-subtle)] pt-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              className="min-w-0 flex-1 px-2"
-              disabled={busyKey !== ""}
-              onClick={() => openEditParty(party)}
-            >
-              Edit
-            </Button>
+          <>
+            <div className="mt-2 flex items-center gap-1 border-t border-[var(--border-subtle)] pt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="px-2"
+                aria-label={`Move ${party.name} left`}
+                disabled={busyKey !== "" || partyIndex <= 0}
+                onClick={() => void moveParty(team, party, -1)}
+              >
+                ←
+              </Button>
+              <button
+                type="button"
+                aria-label={`Drag ${party.name} to reorder`}
+                title="Drag to reorder"
+                disabled={busyKey !== ""}
+                onPointerDown={(event) =>
+                  beginPointerDrag(
+                    event,
+                    {
+                      kind: "party",
+                      id: party.id,
+                      parentId: team.id,
+                    },
+                    "[data-party-drag-card]",
+                  )
+                }
+                onPointerMove={(event) =>
+                  movePointerDrag(event, {
+                    kind: "party",
+                    id: party.id,
+                    parentId: team.id,
+                  })
+                }
+                onPointerUp={(event) =>
+                  finishPartyPointerDrag(event, team, party)
+                }
+                onPointerCancel={cancelPointerDrag}
+                className="hidden h-8 flex-1 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] touch-none select-none active:cursor-grabbing md:inline-flex"
+              >
+                Drag
+              </button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="px-2"
+                aria-label={`Move ${party.name} right`}
+                disabled={
+                  busyKey !== "" ||
+                  partyIndex < 0 ||
+                  partyIndex >= team.parties.length - 1
+                }
+                onClick={() => void moveParty(team, party, 1)}
+              >
+                →
+              </Button>
+            </div>
+
+            <div className="mt-1 flex items-center gap-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="min-w-0 flex-1 px-2"
+                disabled={busyKey !== ""}
+                onClick={() => openEditParty(party)}
+              >
+                Edit
+              </Button>
             <Button
               type="button"
               size="sm"
@@ -468,6 +1062,7 @@ export function TemplateStructureDesigner({
               Delete
             </Button>
           </div>
+          </>
         ) : null}
 
         {!seatCountCorrect ? (
@@ -486,9 +1081,46 @@ export function TemplateStructureDesigner({
 
   function renderTeam(team: TemplateSectionNode) {
     const partyLimitReached = team.parties.length >= TEAM_MAX_PARTIES;
+    const siblingIds = teamSiblingIds(team);
+    const teamIndex = siblingIds.indexOf(team.id);
 
     return (
-      <Surface key={team.id} level={2} className="min-w-0 max-w-full overflow-hidden p-4 sm:p-5">
+      <div
+        key={team.id}
+        data-team-drag-card
+        data-team-id={team.id}
+        data-team-parent-id={team.areaId ?? ""}
+        style={
+          dragOverItem?.kind === "team" && dragOverItem.id === team.id
+            ? {
+                transform: `translate3d(${dragSwapOffset.x}px, ${dragSwapOffset.y}px, 0)`,
+                zIndex: 30,
+              }
+            : undefined
+        }
+        className={`relative rounded-[var(--radius-xl)] transition-[box-shadow,outline-color,transform] duration-150 ${
+          dragItem?.kind === "team" && dragItem.id === team.id
+            ? "outline outline-1 outline-dashed outline-[var(--guild-accent)]"
+            : dragOverItem?.kind === "team" && dragOverItem.id === team.id
+              ? "ring-1 ring-[var(--guild-accent)] shadow-xl"
+              : ""
+        }`}
+      >
+        {dragItem?.kind === "team" && dragItem.id === team.id ? (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius-xl)] border border-dashed border-[var(--guild-accent)] bg-[var(--surface-2)]">
+            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
+              Drop Team here
+            </span>
+          </div>
+        ) : null}
+        <Surface
+          level={2}
+          className={`min-w-0 max-w-full overflow-hidden p-4 transition-all duration-150 sm:p-5 ${
+            dragItem?.kind === "team" && dragItem.id === team.id
+              ? "pointer-events-none opacity-0"
+              : ""
+          }`}
+        >
         <div className="min-w-0 flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -505,6 +1137,59 @@ export function TemplateStructureDesigner({
 
           {!readOnly ? (
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={`Move ${team.name} up`}
+                disabled={busyKey !== "" || teamIndex <= 0}
+                onClick={() => void moveTeam(team, -1)}
+              >
+                ↑
+              </Button>
+              <button
+                type="button"
+                aria-label={`Drag ${team.name} to reorder`}
+                title="Drag Team to reorder"
+                disabled={busyKey !== ""}
+                onPointerDown={(event) =>
+                  beginPointerDrag(
+                    event,
+                    {
+                      kind: "team",
+                      id: team.id,
+                      parentId: team.areaId,
+                    },
+                    "[data-team-drag-card]",
+                  )
+                }
+                onPointerMove={(event) =>
+                  movePointerDrag(event, {
+                    kind: "team",
+                    id: team.id,
+                    parentId: team.areaId,
+                  })
+                }
+                onPointerUp={(event) => finishTeamPointerDrag(event, team)}
+                onPointerCancel={cancelPointerDrag}
+                className="hidden h-8 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-secondary)] touch-none select-none active:cursor-grabbing md:inline-flex"
+              >
+                Drag Team
+              </button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label={`Move ${team.name} down`}
+                disabled={
+                  busyKey !== "" ||
+                  teamIndex < 0 ||
+                  teamIndex >= siblingIds.length - 1
+                }
+                onClick={() => void moveTeam(team, 1)}
+              >
+                ↓
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -546,7 +1231,7 @@ export function TemplateStructureDesigner({
             aria-label={`${team.name} Party board`}
           >
             <div className="flex min-w-max gap-3">
-              {team.parties.map(renderParty)}
+              {partiesForRender(team).map((party) => renderParty(party, team))}
             </div>
           </div>
         ) : (
@@ -570,6 +1255,7 @@ export function TemplateStructureDesigner({
           </div>
         )}
       </Surface>
+      </div>
     );
   }
 
@@ -628,7 +1314,7 @@ export function TemplateStructureDesigner({
 
         {area.sections.length > 0 ? (
           <div className="mt-4 grid gap-4">
-            {area.sections.map(renderTeam)}
+            {teamsForRender(area.sections, area.id).map(renderTeam)}
           </div>
         ) : (
           <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] p-5">
@@ -651,7 +1337,11 @@ export function TemplateStructureDesigner({
   }
 
   return (
-    <div className="min-w-0 overflow-x-hidden px-5 py-8 sm:px-8 lg:px-10">
+    <div
+      className={`min-w-0 overflow-x-hidden px-5 py-8 sm:px-8 lg:px-10 ${
+        reorderBusy ? "[&_button:disabled]:opacity-100" : ""
+      }`}
+    >
       <div className="mx-auto min-w-0 max-w-[96rem]">
         <Link
           href={`/app/guild/${guildId}/templates`}
@@ -688,19 +1378,6 @@ export function TemplateStructureDesigner({
             </p>
           </div>
 
-          {!readOnly ? (
-            <Button
-              type="button"
-              size="lg"
-              onClick={() =>
-                template.usesAreas
-                  ? openCreateArea()
-                  : openCreateTeam()
-              }
-            >
-              {template.usesAreas ? "Add Area" : "Add Team"}
-            </Button>
-          ) : null}
         </div>
 
         {template.status === "active" ? (
@@ -770,7 +1447,8 @@ export function TemplateStructureDesigner({
         </div>
 
         <section className="mt-8">
-          <div>
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="min-w-0">
             <p className="text-xs font-semibold tracking-[0.14em] text-[var(--guild-accent)] uppercase">
               Team Layout
             </p>
@@ -781,8 +1459,25 @@ export function TemplateStructureDesigner({
               Future Event building can render these Teams as Party columns
               with five assignment cells, matching the roster-board style
               you use in-game. Multiple Teams can live inside the same
-              Template.
+              Template. Drag on desktop, or use the arrow controls on
+              touch and keyboard devices, to reorder Teams and Parties.
             </p>
+          </div>
+
+            {!readOnly ? (
+              <Button
+                type="button"
+                size="lg"
+                className="shrink-0"
+                onClick={() =>
+                  template.usesAreas
+                    ? openCreateArea()
+                    : openCreateTeam()
+                }
+              >
+                {template.usesAreas ? "Add Area" : "Add Team"}
+              </Button>
+            ) : null}
           </div>
 
           {structureCount === 0 ? (
@@ -817,7 +1512,7 @@ export function TemplateStructureDesigner({
             </div>
           ) : (
             <div className="mt-5 grid gap-5">
-              {template.tree.rootSections.map(renderTeam)}
+              {teamsForRender(template.tree.rootSections, null).map(renderTeam)}
             </div>
           )}
         </section>

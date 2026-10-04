@@ -119,6 +119,56 @@ export function parseTeamPartyCount(
   return { ok: true, value: parsed };
 }
 
+export function moveOrderedId(
+  ids: string[],
+  id: string,
+  offset: number,
+) {
+  const sourceIndex = ids.indexOf(id);
+  const targetIndex = sourceIndex + offset;
+
+  if (
+    sourceIndex < 0 ||
+    targetIndex < 0 ||
+    targetIndex >= ids.length ||
+    sourceIndex === targetIndex
+  ) {
+    return [...ids];
+  }
+
+  const next = [...ids];
+  [next[sourceIndex], next[targetIndex]] = [
+    next[targetIndex],
+    next[sourceIndex],
+  ];
+  return next;
+}
+
+export function reorderOrderedIdsToTarget(
+  ids: string[],
+  sourceId: string,
+  targetId: string,
+) {
+  const sourceIndex = ids.indexOf(sourceId);
+  const targetIndex = ids.indexOf(targetId);
+
+  if (
+    sourceIndex < 0 ||
+    targetIndex < 0 ||
+    sourceIndex === targetIndex
+  ) {
+    return [...ids];
+  }
+
+  const next = [...ids];
+  const [moved] = next.splice(sourceIndex, 1);
+
+  if (!moved) return [...ids];
+
+  next.splice(targetIndex, 0, moved);
+  return next;
+}
+
 function compareOrdered(
   left: { sortOrder: number; id: string },
   right: { sortOrder: number; id: string },
