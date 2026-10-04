@@ -700,6 +700,18 @@ isOneToOne: false
 "create_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_guild_id": string,"p_name": string,"p_uses_areas"?: boolean }; Returns: string
                            },
+"create_event_template_area":
+{ Args: { "p_name": string,"p_sort_order"?: number,"p_template_id": string }; Returns: string
+                           },
+"create_event_template_party":
+{ Args: { "p_name": string,"p_section_id": string,"p_sort_order"?: number }; Returns: string
+                           },
+"create_event_template_section":
+{ Args: { "p_area_id"?: string,"p_name": string,"p_sort_order"?: number,"p_template_id": string }; Returns: string
+                           },
+"create_event_template_slot":
+{ Args: { "p_name": string,"p_party_id": string,"p_role_label"?: string,"p_sort_order"?: number }; Returns: string
+                           },
 "create_event_type":
 { Args: { "p_description"?: string,"p_guild_id": string,"p_name": string }; Returns: string
                            },
@@ -720,6 +732,18 @@ isOneToOne: false
                            },
 "delete_event_template":
 { Args: { "p_template_id": string }; Returns: undefined
+                           },
+"delete_event_template_area":
+{ Args: { "p_area_id": string }; Returns: undefined
+                           },
+"delete_event_template_party":
+{ Args: { "p_party_id": string }; Returns: undefined
+                           },
+"delete_event_template_section":
+{ Args: { "p_section_id": string }; Returns: undefined
+                           },
+"delete_event_template_slot":
+{ Args: { "p_slot_id": string }; Returns: undefined
                            },
 "delete_event_type":
 { Args: { "p_event_type_id": string }; Returns: undefined
@@ -791,6 +815,18 @@ isOneToOne: false
                            },
 "update_event_template":
 { Args: { "p_description": string,"p_event_type_id": string,"p_name": string,"p_status": string,"p_template_id": string,"p_uses_areas": boolean }; Returns: undefined
+                           },
+"update_event_template_area":
+{ Args: { "p_area_id": string,"p_name": string,"p_sort_order": number }; Returns: undefined
+                           },
+"update_event_template_party":
+{ Args: { "p_name": string,"p_party_id": string,"p_section_id": string,"p_sort_order": number }; Returns: undefined
+                           },
+"update_event_template_section":
+{ Args: { "p_area_id": string,"p_name": string,"p_section_id": string,"p_sort_order": number }; Returns: undefined
+                           },
+"update_event_template_slot":
+{ Args: { "p_name": string,"p_party_id": string,"p_role_label": string,"p_slot_id": string,"p_sort_order": number }; Returns: undefined
                            },
 "update_event_type":
 { Args: { "p_description": string,"p_event_type_id": string,"p_name": string,"p_status": string }; Returns: undefined
