@@ -697,6 +697,12 @@ isOneToOne: false
 "bulk_update_roster_characters":
 { Args: { "p_action": string,"p_character_ids": (string)[],"p_value": string }; Returns: number
                            },
+"create_event_template":
+{ Args: { "p_description"?: string,"p_event_type_id": string,"p_guild_id": string,"p_name": string,"p_uses_areas"?: boolean }; Returns: string
+                           },
+"create_event_type":
+{ Args: { "p_description"?: string,"p_guild_id": string,"p_name": string }; Returns: string
+                           },
 "create_guild":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -711,6 +717,12 @@ isOneToOne: false
                            },
 "create_roster_tag":
 { Args: { "p_guild_id": string,"p_name": string }; Returns: string
+                           },
+"delete_event_template":
+{ Args: { "p_template_id": string }; Returns: undefined
+                           },
+"delete_event_type":
+{ Args: { "p_event_type_id": string }; Returns: undefined
                            },
 "delete_roster_custom_field":
 { Args: { "p_field_id": string }; Returns: undefined
@@ -776,6 +788,12 @@ isOneToOne: false
                            },
 "transfer_guild_ownership":
 { Args: { "p_guild_id": string,"p_new_owner_membership_id": string }; Returns: undefined
+                           },
+"update_event_template":
+{ Args: { "p_description": string,"p_event_type_id": string,"p_name": string,"p_status": string,"p_template_id": string,"p_uses_areas": boolean }; Returns: undefined
+                           },
+"update_event_type":
+{ Args: { "p_description": string,"p_event_type_id": string,"p_name": string,"p_status": string }; Returns: undefined
                            },
 "update_roster_character":
 { Args: { "p_character_id": string,"p_class_name": string,"p_gear_score": number,"p_gender": string,"p_guild_position": string,"p_ign": string,"p_level": number,"p_online_status": string,"p_title": string,"p_total_contribution": number,"p_weekly_activity": number,"p_weekly_contribution": number }; Returns: undefined
