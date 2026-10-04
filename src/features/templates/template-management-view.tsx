@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -395,7 +396,7 @@ export function TemplateManagementView({
             </p>
             <p className="mt-2 text-2xl font-semibold">{liveSeatCount}</p>
             <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-              Slot rows
+              seat rows
             </p>
           </Surface>
         </div>
@@ -515,7 +516,7 @@ export function TemplateManagementView({
                     </div>
                     <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3">
                       <p className="text-xs text-[var(--text-tertiary)]">
-                        Sections
+                        Teams
                       </p>
                       <p className="mt-1 font-semibold">
                         {template.sectionCount}
@@ -543,10 +544,16 @@ export function TemplateManagementView({
                     <p className="text-xs text-[var(--text-tertiary)]">
                       Updated{" "}
                       {new Date(template.updatedAt).toLocaleDateString()}
-                      {structureCount === 0 ? " · Structure not started" : ""}
+                      {structureCount === 0 ? " · Team layout not started" : ""}
                     </p>
 
                     <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/app/guild/${guildId}/templates/${template.id}`}
+                        className="inline-flex h-8 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-2)] px-3 text-sm font-semibold text-[var(--text-primary)] transition-colors hover:bg-[var(--surface-3)]"
+                      >
+                        Design teams
+                      </Link>
                       <Button
                         type="button"
                         size="sm"
@@ -677,10 +684,10 @@ export function TemplateManagementView({
               className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
             >
               <option value="false">
-                Sections → Parties → Slots
+                Teams → Parties → 5 seats
               </option>
               <option value="true">
-                Areas → Sections → Parties → Slots
+                Areas → Teams → Parties → 5 seats
               </option>
             </select>
           </label>

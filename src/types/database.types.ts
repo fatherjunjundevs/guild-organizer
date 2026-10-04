@@ -709,11 +709,17 @@ isOneToOne: false
 "create_event_template_party":
 { Args: { "p_name": string,"p_section_id": string,"p_sort_order"?: number }; Returns: string
                            },
+"create_event_template_party_with_slots":
+{ Args: { "p_seat_count"?: number,"p_section_id": string }; Returns: string
+                           },
 "create_event_template_section":
 { Args: { "p_area_id"?: string,"p_name": string,"p_sort_order"?: number,"p_template_id": string }; Returns: string
                            },
 "create_event_template_slot":
 { Args: { "p_name": string,"p_party_id": string,"p_role_label"?: string,"p_sort_order"?: number }; Returns: string
+                           },
+"create_event_template_team":
+{ Args: { "p_area_id"?: string,"p_name": string,"p_party_count"?: number,"p_seat_count"?: number,"p_template_id": string }; Returns: string
                            },
 "create_event_type":
 { Args: { "p_description"?: string,"p_guild_id": string,"p_name": string }; Returns: string
