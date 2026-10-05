@@ -22,6 +22,16 @@ import {
   updateTemplateTeamAction,
   type TemplateStructureMutationResult,
 } from "@/features/templates/structure-actions";
+import {
+  activateEventTemplateAction,
+  inspectEventTemplateAction,
+} from "@/features/templates/readiness-actions";
+import {
+  hasBlockingValidationIssues,
+  type EventTemplateInspection,
+  type TemplatePreviewParty,
+  type TemplatePreviewTeam,
+} from "@/features/templates/template-readiness";
 import type { TemplateStructureSummary } from "@/features/templates/structure-server";
 import {
   PARTY_SEAT_COUNT,
@@ -170,6 +180,7 @@ export function TemplateStructureDesigner({
 }) {
   const router = useRouter();
   const editorDialogRef = useRef<HTMLDialogElement>(null);
+  const previewDialogRef = useRef<HTMLDialogElement>(null);
   const [editor, setEditor] = useState<EditorTarget | null>(null);
   const [pendingDelete, setPendingDelete] =
     useState<DeleteTarget | null>(null);
@@ -189,6 +200,10 @@ export function TemplateStructureDesigner({
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [inspection, setInspection] = useState<EventTemplateInspection | null>(null);
+  const [readinessBusy, setReadinessBusy] = useState<"" | "inspect" | "activate">("");
+  const [readinessMessage, setReadinessMessage] = useState("");
+  const [readinessError, setReadinessError] = useState(false);
 
   const readOnly = template.status === "archived";
   const reorderBusy = busyKey.startsWith("reorder-");
@@ -197,6 +212,11 @@ export function TemplateStructureDesigner({
     template.sectionCount +
     template.partyCount +
     template.slotCount;
+  const blockingIssueCount = inspection
+    ? inspection.issues.filter((issue) => issue.severity === "error").length
+    : null;
+  const templateReady =
+    inspection !== null && !hasBlockingValidationIssues(inspection.issues);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -409,6 +429,83 @@ export function TemplateStructureDesigner({
     return result.ok;
   }
 
+  function invalidateInspection() {
+    setInspection(null);
+    setReadinessMessage("");
+    setReadinessError(false);
+  }
+
+  async function inspectTemplate(openPreview = false) {
+    const data = new FormData();
+    data.set("guildId", guildId);
+    data.set("templateId", template.id);
+
+    setReadinessBusy("inspect");
+    setReadinessMessage("");
+    setReadinessError(false);
+
+    try {
+      const result = await inspectEventTemplateAction(data);
+
+      if (!result.ok) {
+        setInspection(null);
+        setReadinessMessage(result.message);
+        setReadinessError(true);
+        return;
+      }
+
+      setInspection(result.inspection);
+      setReadinessMessage(
+        hasBlockingValidationIssues(result.inspection.issues)
+          ? "Resolve the validation errors below before activating this Template."
+          : "Template validation passed. This Template is ready to activate.",
+      );
+
+      if (openPreview) {
+        window.requestAnimationFrame(() => {
+          previewDialogRef.current?.showModal();
+        });
+      }
+    } catch {
+      setInspection(null);
+      setReadinessMessage("Template readiness could not be checked.");
+      setReadinessError(true);
+    } finally {
+      setReadinessBusy("");
+    }
+  }
+
+  async function activateTemplate() {
+    if (!templateReady || template.status !== "draft") return;
+
+    const data = new FormData();
+    data.set("guildId", guildId);
+    data.set("templateId", template.id);
+
+    setReadinessBusy("activate");
+    setReadinessMessage("");
+    setReadinessError(false);
+
+    try {
+      const result = await activateEventTemplateAction(data);
+
+      if (!result.ok) {
+        setReadinessMessage(result.message);
+        setReadinessError(true);
+        return;
+      }
+
+      setInspection(null);
+      setReadinessMessage(result.message);
+      router.refresh();
+    } catch {
+      setReadinessMessage("Template activation could not be completed.");
+      setReadinessError(true);
+    } finally {
+      setReadinessBusy("");
+    }
+  }
+
   function showEditor(target: EditorTarget) {
     clearMessage();
     setEditor(target);
@@ -556,6 +653,8 @@ export function TemplateStructureDesigner({
     event.preventDefault();
     if (!editor) return;
 
+    invalidateInspection();
+
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("templateId", template.id);
@@ -615,6 +714,7 @@ export function TemplateStructureDesigner({
   }
 
   async function addParty(team: TemplateSectionNode) {
+    invalidateInspection();
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("templateId", template.id);
@@ -655,6 +755,7 @@ export function TemplateStructureDesigner({
     orderedIds: string[],
     refreshAfterSave = true,
   ) {
+    invalidateInspection();
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("templateId", template.id);
@@ -697,6 +798,7 @@ export function TemplateStructureDesigner({
     orderedIds: string[],
     refreshAfterSave = true,
   ) {
+    invalidateInspection();
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("templateId", template.id);
@@ -740,6 +842,7 @@ export function TemplateStructureDesigner({
   async function confirmDelete() {
     if (!pendingDelete) return;
 
+    invalidateInspection();
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("templateId", template.id);
@@ -1336,6 +1439,61 @@ export function TemplateStructureDesigner({
     );
   }
 
+  function renderPreviewParty(party: TemplatePreviewParty) {
+    return (
+      <div
+        key={party.id}
+        className="w-44 shrink-0 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-2)] p-3"
+      >
+        <p className="truncate text-sm font-semibold" title={party.name}>
+          {party.name}
+        </p>
+        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+          {party.slots.length} seat{party.slots.length === 1 ? "" : "s"}
+        </p>
+        <div className="mt-3 grid gap-2">
+          {party.slots.map((slot) => (
+            <div
+              key={slot.id}
+              className="min-h-14 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2"
+            >
+              <p className="text-xs font-semibold text-[var(--text-secondary)]">
+                {slot.roleLabel ?? "Open seat"}
+              </p>
+              <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
+                {slot.roleLabel ? "Role requirement" : "Any role"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function renderPreviewTeam(team: TemplatePreviewTeam) {
+    return (
+      <Surface key={team.id} level={2} className="min-w-0 max-w-full overflow-hidden p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg font-semibold">{team.name}</h3>
+          <StatusChip tone="accent">
+            {team.parties.length} {team.parties.length === 1 ? "Party" : "Parties"}
+          </StatusChip>
+        </div>
+        {team.parties.length > 0 ? (
+          <div className="mt-4 min-w-0 w-full max-w-full overflow-x-auto overscroll-x-contain pb-2">
+            <div className="flex min-w-max gap-3">
+              {team.parties.map(renderPreviewParty)}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-4 text-sm text-[var(--text-secondary)]">
+            No Parties in this Team.
+          </p>
+        )}
+      </Surface>
+    );
+  }
+
   return (
     <div
       className={`min-w-0 overflow-x-hidden px-5 py-8 sm:px-8 lg:px-10 ${
@@ -1402,6 +1560,108 @@ export function TemplateStructureDesigner({
             </p>
           </div>
         ) : null}
+
+        <Surface level={2} className="mt-5 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-xs font-semibold tracking-[0.14em] text-[var(--guild-accent)] uppercase">
+                  Template Readiness
+                </p>
+                <StatusChip
+                  tone={
+                    template.status === "active"
+                      ? "success"
+                      : inspection === null
+                        ? "neutral"
+                        : templateReady
+                          ? "success"
+                          : "warning"
+                  }
+                >
+                  {template.status === "active"
+                    ? "Active"
+                    : inspection === null
+                      ? "Not checked"
+                      : templateReady
+                        ? "Ready"
+                        : `${blockingIssueCount ?? 0} issue${blockingIssueCount === 1 ? "" : "s"}`}
+                </StatusChip>
+              </div>
+              <h2 className="mt-2 text-lg font-semibold">
+                Validate before this Template is used for Events
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+                Validation uses the canonical database rules. Preview uses the ordered
+                Template snapshot that future Event creation will consume.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={readinessBusy !== ""}
+                onClick={() => void inspectTemplate(false)}
+              >
+                {readinessBusy === "inspect" ? "Checking…" : "Check Readiness"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={readinessBusy !== ""}
+                onClick={() => void inspectTemplate(true)}
+              >
+                Preview
+              </Button>
+              {template.status === "draft" ? (
+                <Button
+                  type="button"
+                  disabled={readinessBusy !== "" || !templateReady}
+                  onClick={() => void activateTemplate()}
+                  title={templateReady ? "Activate Template" : "Check readiness and resolve validation errors first"}
+                >
+                  {readinessBusy === "activate" ? "Activating…" : "Activate Template"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          {readinessMessage ? (
+            <p
+              aria-live="polite"
+              className={`mt-4 text-sm font-semibold ${
+                readinessError
+                  ? "text-[var(--danger)]"
+                  : templateReady
+                    ? "text-[var(--success)]"
+                    : "text-[var(--warning)]"
+              }`}
+            >
+              {readinessMessage}
+            </p>
+          ) : null}
+
+          {inspection && inspection.issues.length > 0 ? (
+            <div className="mt-4 grid gap-2">
+              {inspection.issues.map((issue, index) => (
+                <div
+                  key={`${issue.issueCode}:${issue.entityId}:${index}`}
+                  className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] px-3 py-2"
+                >
+                  <p className="text-sm font-semibold">{issue.message}</p>
+                  <p className="mt-1 text-xs text-[var(--text-tertiary)]">
+                    {issue.entityType} · {issue.issueCode}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : inspection ? (
+            <p className="mt-4 text-sm text-[var(--text-secondary)]">
+              No blocking validation issues were found.
+            </p>
+          ) : null}
+        </Surface>
 
         <MutationMessage message={message} isError={isError} />
 
@@ -1681,6 +1941,90 @@ export function TemplateStructureDesigner({
                 </Button>
               </div>
             </form>
+          </>
+        ) : null}
+      </dialog>
+
+      <dialog
+        ref={previewDialogRef}
+        aria-labelledby="template-preview-title"
+        className="m-auto w-[min(92rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
+      >
+        {inspection ? (
+          <>
+            <div className="sticky top-0 z-20 flex flex-wrap items-start justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--surface-1)] px-5 py-4">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusChip tone="accent">Template Preview</StatusChip>
+                  <StatusChip tone={inspection.issues.length === 0 ? "success" : "warning"}>
+                    {inspection.issues.length === 0
+                      ? "Validation passed"
+                      : `${inspection.issues.length} issue${inspection.issues.length === 1 ? "" : "s"}`}
+                  </StatusChip>
+                </div>
+                <h2 id="template-preview-title" className="mt-2 text-2xl font-semibold">
+                  {inspection.preview.templateName}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  {inspection.preview.eventTypeName} · read-only ordered preview
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => previewDialogRef.current?.close()}
+              >
+                Close Preview
+              </Button>
+            </div>
+
+            <div className="p-5 sm:p-6">
+              {inspection.issues.length > 0 ? (
+                <div className="mb-5 rounded-[var(--radius-lg)] border border-[color-mix(in_srgb,var(--warning)_35%,transparent)] bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] p-4">
+                  <p className="text-sm font-semibold text-[var(--warning)]">
+                    Preview is available, but this Template is not ready to activate.
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                    Return to the designer and resolve the readiness issues.
+                  </p>
+                </div>
+              ) : null}
+
+              {inspection.preview.usesAreas ? (
+                inspection.preview.areas.length > 0 ? (
+                  <div className="grid gap-5">
+                    {inspection.preview.areas.map((area) => (
+                      <section
+                        key={area.id}
+                        className="rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-4 sm:p-5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-xl font-semibold">{area.name}</h3>
+                          <StatusChip tone="neutral">
+                            {area.teams.length} Team{area.teams.length === 1 ? "" : "s"}
+                          </StatusChip>
+                        </div>
+                        <div className="mt-4 grid gap-4">
+                          {area.teams.map(renderPreviewTeam)}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--text-secondary)]">
+                    This Area-based Template has no Areas yet.
+                  </p>
+                )
+              ) : inspection.preview.rootTeams.length > 0 ? (
+                <div className="grid gap-4">
+                  {inspection.preview.rootTeams.map(renderPreviewTeam)}
+                </div>
+              ) : (
+                <p className="text-sm text-[var(--text-secondary)]">
+                  This Template has no Teams yet.
+                </p>
+              )}
+            </div>
           </>
         ) : null}
       </dialog>
