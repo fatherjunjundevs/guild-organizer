@@ -1285,7 +1285,7 @@ export function TemplateStructureDesigner({
               }
             : undefined
         }
-        className={`relative rounded-[var(--radius-xl)] transition-[box-shadow,outline-color,transform] duration-150 ${
+        className={`relative min-w-0 w-full max-w-full rounded-[var(--radius-xl)] transition-[box-shadow,outline-color,transform] duration-150 ${
           dragItem?.kind === "team" && dragItem.id === team.id
             ? "outline outline-1 outline-dashed outline-[var(--guild-accent)]"
             : dragOverItem?.kind === "team" && dragOverItem.id === team.id
