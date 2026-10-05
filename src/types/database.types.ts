@@ -931,6 +931,9 @@ isOneToOne: false
 "clone_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_name": string,"p_source_template_id": string }; Returns: string
                            },
+"create_event_from_template":
+{ Args: { "p_description"?: string,"p_name": string,"p_template_id": string }; Returns: string
+                           },
 "create_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_guild_id": string,"p_name": string,"p_uses_areas"?: boolean }; Returns: string
                            },
