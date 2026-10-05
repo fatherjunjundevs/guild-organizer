@@ -54,8 +54,28 @@ Phase 3 is quality-gated complete.
 
 See [`PHASE_3_QUALITY_GATE.md`](PHASE_3_QUALITY_GATE.md) for evidence and scope boundaries.
 
-## Phase 4 — Event Template Designer ⏳
-Event Types, reusable templates, optional Area -> Section -> Party -> Slot hierarchy, custom names/seat counts, role requirements, template validation, preview, cloning, and edit rules.
+## Phase 4 — Event Template Designer ✅
+
+Completed Phase 4 scope:
+
+- Guild-defined Event Types and reusable Templates ✅
+- Draft / Active / Archived Template lifecycle ✅
+- Flat Team (Section) -> Party -> Slot hierarchy ✅
+- Optional Area -> Team (Section) -> Party -> Slot hierarchy ✅
+- Custom structure names and configurable 1–8 Party seat counts ✅
+- Party resizing with explicit destructive confirmation ✅
+- Optional per-seat role requirements ✅
+- Team and Party reordering ✅
+- Canonical readiness validation and ordered read-only preview ✅
+- Guarded activation and Active -> Draft structural edit rules ✅
+- Independent Template cloning ✅
+- Capability-gated management and authorization regression coverage ✅
+- Responsive Party-board overflow and deletion scroll-position regression coverage ✅
+- Full local Phase 4 quality gate: lint, TypeScript, unit, build, E2E, DB lint/tests/types/advisors, and diff checks ✅
+
+Phase 4 is quality-gated complete.
+
+See [`PHASE_4_QUALITY_GATE.md`](PHASE_4_QUALITY_GATE.md) for evidence and scope boundaries.
 
 ## Phase 5 — Guild League Builder / Core v1 ⏳
 Event creation from template, Event-owned structural snapshot, assignment workflow, drag/drop, warning system, duplicate detection, missing-role detection, unassigned/eligible views, responsive parity, and fast assignment search.

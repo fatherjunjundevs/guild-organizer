@@ -4,11 +4,11 @@ An unofficial community tool for organizing guild rosters, events, assignments, 
 
 ## Current Development Status
 
-**Official roadmap:** Phase 3 — Master Guild Roster ✅
+**Official roadmap:** Phase 4 — Event Template Designer ✅
 
-**Current status:** Phase 3 quality-gated complete ✅
+**Current status:** Phase 4 quality-gated complete ✅
 
-**Next phase:** Phase 4 — Event Template Designer ⏳
+**Next phase:** Phase 5 — Guild League Builder / Core v1 ⏳
 
 Implemented so far includes:
 
@@ -34,6 +34,14 @@ Implemented so far includes:
 - Import and reconciliation history for organizer visibility and audit context
 - Responsive roster hardening with loading, empty/error, and accessibility states
 - Measured larger-roster hardening with 200-character render pages while full-roster filtering/sorting remains intact
+- Guild-defined Event Types and reusable Event Templates
+- Flat and optional Area-grouped Team -> Party -> Slot Template structures
+- Configurable 1–8 Party seat counts with safe resize rules
+- Optional seat role requirements plus Team/Party reordering
+- Template readiness validation, ordered preview, activation, and Active -> Draft edit lifecycle
+- Independent Template cloning with fresh structure identifiers
+- Capability-gated Template management with critical Playwright authorization/lifecycle coverage
+- Responsive Template-board overflow and deletion scroll-position regression coverage
 - Vitest + Testing Library
 - Playwright end-to-end testing
 - GitHub Actions CI
@@ -49,6 +57,7 @@ The repository keeps the product plan and engineering expectations alongside the
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md)
 - [`docs/PHASE_3_QUALITY_GATE.md`](docs/PHASE_3_QUALITY_GATE.md)
+- [`docs/PHASE_4_QUALITY_GATE.md`](docs/PHASE_4_QUALITY_GATE.md)
 
 These are authoritative project references and should be updated when product decisions change.
 
