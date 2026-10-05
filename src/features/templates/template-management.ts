@@ -15,6 +15,12 @@ export type TemplateManagementInput = {
   status: string;
 };
 
+export type TemplateCloneInput = {
+  eventTypeId: string;
+  name: string;
+  description: string;
+};
+
 export type ParsedEventTypeManagementInput = {
   name: string;
   description: string | null;
@@ -27,6 +33,12 @@ export type ParsedTemplateManagementInput = {
   description: string | null;
   usesAreas: boolean;
   status: TemplateManagementStatus;
+};
+
+export type ParsedTemplateCloneInput = {
+  eventTypeId: string;
+  name: string;
+  description: string | null;
 };
 
 type ParseResult<T> =
@@ -153,4 +165,59 @@ export function parseTemplateManagementInput(
       status: input.status,
     },
   };
+}
+
+export function parseTemplateCloneInput(
+  input: TemplateCloneInput,
+): ParseResult<ParsedTemplateCloneInput> {
+  if (!isValidUuid(input.eventTypeId)) {
+    return {
+      ok: false,
+      message: "Choose a valid destination Event Type.",
+    };
+  }
+
+  const name = requiredTrimmedText(input.name, "Template name", 120);
+  const description = optionalTrimmedText(
+    input.description,
+    "Template description",
+    1000,
+  );
+
+  if (!name.ok) return name;
+  if (!description.ok) return description;
+
+  return {
+    ok: true,
+    value: {
+      eventTypeId: input.eventTypeId,
+      name: name.value,
+      description: description.value,
+    },
+  };
+}
+
+export function suggestTemplateCloneName(
+  sourceName: string,
+  existingNames: string[],
+) {
+  const source = sourceName.trim() || "Template";
+  const copyMatch = source.match(/^(.*?)(?:\s+Copy(?:\s+\d+)?)$/i);
+  const base = copyMatch?.[1]?.trim() || source;
+  const existing = new Set(
+    existingNames.map((name) => name.trim().toLocaleLowerCase()),
+  );
+  let copyNumber = 1;
+
+  while (true) {
+    const suffix = copyNumber === 1 ? " Copy" : ` Copy ${copyNumber}`;
+    const maxBaseLength = Math.max(1, 120 - suffix.length);
+    const candidate = `${base.slice(0, maxBaseLength).trimEnd()}${suffix}`;
+
+    if (!existing.has(candidate.toLocaleLowerCase())) {
+      return candidate;
+    }
+
+    copyNumber += 1;
+  }
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   isValidUuid,
   parseEventTypeManagementInput,
+  parseTemplateCloneInput,
   parseTemplateManagementInput,
 } from "@/features/templates/template-management";
 import { createClient } from "@/lib/supabase/server";
@@ -243,6 +244,52 @@ export async function updateEventTemplateAction(
       parsed.value.status === "archived"
         ? `${parsed.value.name} was archived.`
         : `${parsed.value.name} was saved as a draft.`,
+    id: templateId,
+  };
+}
+
+export async function cloneEventTemplateAction(
+  formData: FormData,
+): Promise<TemplateMutationResult> {
+  const guildId = getString(formData, "guildId");
+  const sourceTemplateId = getString(formData, "sourceTemplateId");
+
+  if (!isValidUuid(guildId) || !isValidUuid(sourceTemplateId)) {
+    return {
+      ok: false,
+      message: "The source Template identifiers are invalid.",
+    };
+  }
+
+  const parsed = parseTemplateCloneInput({
+    eventTypeId: getString(formData, "eventTypeId"),
+    name: getString(formData, "name"),
+    description: getString(formData, "description"),
+  });
+
+  if (!parsed.ok) return parsed;
+
+  const supabase = await createClient();
+  const { data: templateId, error } = await supabase.rpc(
+    "clone_event_template",
+    {
+      p_source_template_id: sourceTemplateId,
+      p_event_type_id: parsed.value.eventTypeId,
+      p_name: parsed.value.name,
+      p_description: nullableText(parsed.value.description),
+    },
+  );
+
+  if (error || !templateId) {
+    return { ok: false, message: mapTemplateRpcError(error?.code) };
+  }
+
+  revalidatePath(templatesPath(guildId));
+  revalidatePath(`/app/guild/${guildId}/templates/${templateId}`);
+
+  return {
+    ok: true,
+    message: `${parsed.value.name} was cloned as a new draft.`,
     id: templateId,
   };
 }

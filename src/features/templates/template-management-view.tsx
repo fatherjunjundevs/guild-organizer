@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
 import {
+  cloneEventTemplateAction,
   createEventTemplateAction,
   createEventTypeAction,
   updateEventTemplateAction,
   updateEventTypeAction,
   type TemplateMutationResult,
 } from "@/features/templates/actions";
+import { suggestTemplateCloneName } from "@/features/templates/template-management";
 import type {
   EventTemplateSummary,
   EventTypeSummary,
@@ -66,6 +68,7 @@ export function TemplateManagementView({
 }: TemplateManagementViewProps) {
   const router = useRouter();
   const createTemplateDialogRef = useRef<HTMLDialogElement>(null);
+  const cloneTemplateDialogRef = useRef<HTMLDialogElement>(null);
   const eventTypeDialogRef = useRef<HTMLDialogElement>(null);
   const editTemplateDialogRef = useRef<HTMLDialogElement>(null);
 
@@ -73,6 +76,8 @@ export function TemplateManagementView({
   const [statusFilter, setStatusFilter] = useState("live");
   const [eventTypeFilter, setEventTypeFilter] = useState("all");
   const [editingTemplate, setEditingTemplate] =
+    useState<EventTemplateSummary | null>(null);
+  const [cloningTemplate, setCloningTemplate] =
     useState<EventTemplateSummary | null>(null);
   const [editingEventTypeId, setEditingEventTypeId] =
     useState<string | null>(null);
@@ -241,6 +246,47 @@ export function TemplateManagementView({
 
     form.reset();
     createTemplateDialogRef.current?.close();
+    router.refresh();
+  }
+
+  function openTemplateClone(template: EventTemplateSummary) {
+    clearMessage();
+    setCloningTemplate(template);
+    window.requestAnimationFrame(() => {
+      cloneTemplateDialogRef.current?.showModal();
+    });
+  }
+
+  async function submitCloneTemplate(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!cloningTemplate) {
+      return;
+    }
+
+    setBusyKey(`template-clone:${cloningTemplate.id}`);
+    clearMessage();
+
+    const result = await cloneEventTemplateAction(
+      new FormData(event.currentTarget),
+    );
+
+    setBusyKey("");
+
+    if (!applyResult(result)) {
+      return;
+    }
+
+    cloneTemplateDialogRef.current?.close();
+    setCloningTemplate(null);
+
+    if (result.id) {
+      router.push(`/app/guild/${guildId}/templates/${result.id}`);
+      return;
+    }
+
     router.refresh();
   }
 
@@ -563,6 +609,20 @@ export function TemplateManagementView({
                       >
                         Edit details
                       </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        disabled={busyKey !== "" || activeEventTypes.length === 0}
+                        title={
+                          activeEventTypes.length === 0
+                            ? "Restore or create an active Event Type before cloning."
+                            : "Clone this Template into a new independent Draft."
+                        }
+                        onClick={() => openTemplateClone(template)}
+                      >
+                        Clone
+                      </Button>
 
                       {template.status === "archived" ? (
                         <Button
@@ -719,6 +779,149 @@ export function TemplateManagementView({
             </Button>
           </div>
         </form>
+      </dialog>
+
+      <dialog
+        ref={cloneTemplateDialogRef}
+        aria-labelledby="clone-template-title"
+        onClose={() => {
+          clearMessage();
+          setCloningTemplate(null);
+        }}
+        className="m-auto w-[min(42rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
+      >
+        {cloningTemplate ? (
+          <>
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-5 py-4 sm:px-6">
+              <div>
+                <StatusChip tone="accent">Clone Template</StatusChip>
+                <h2
+                  id="clone-template-title"
+                  className="mt-2 text-xl font-semibold"
+                >
+                  Create independent Draft copy
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  Copy &ldquo;{cloningTemplate.name}&rdquo; without changing the source Template.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => cloneTemplateDialogRef.current?.close()}
+              >
+                Close
+              </Button>
+            </div>
+
+            <form
+              key={cloningTemplate.id}
+              onSubmit={submitCloneTemplate}
+              className="p-5 sm:p-6"
+            >
+              <input type="hidden" name="guildId" value={guildId} />
+              <input
+                type="hidden"
+                name="sourceTemplateId"
+                value={cloningTemplate.id}
+              />
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3">
+                  <p className="text-xs text-[var(--text-tertiary)]">Areas</p>
+                  <p className="mt-1 font-semibold">{cloningTemplate.areaCount}</p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3">
+                  <p className="text-xs text-[var(--text-tertiary)]">Teams</p>
+                  <p className="mt-1 font-semibold">{cloningTemplate.sectionCount}</p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3">
+                  <p className="text-xs text-[var(--text-tertiary)]">Parties</p>
+                  <p className="mt-1 font-semibold">{cloningTemplate.partyCount}</p>
+                </div>
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] p-3">
+                  <p className="text-xs text-[var(--text-tertiary)]">Seats</p>
+                  <p className="mt-1 font-semibold">{cloningTemplate.slotCount}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--surface-2)] p-4">
+                <p className="text-sm font-semibold">The clone is independent.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                  Areas, Teams, Parties, seat order, and role requirements are copied with new IDs. The new Template always starts as Draft.
+                </p>
+              </div>
+
+              <label className="mt-5 block text-sm font-semibold">
+                Destination Event Type
+                <select
+                  name="eventTypeId"
+                  required
+                  defaultValue={
+                    cloningTemplate.eventTypeStatus === "active"
+                      ? cloningTemplate.eventTypeId
+                      : activeEventTypes[0]?.id ?? ""
+                  }
+                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
+                >
+                  {activeEventTypes.map((eventType) => (
+                    <option key={eventType.id} value={eventType.id}>
+                      {eventType.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="mt-5 block text-sm font-semibold">
+                New Template name
+                <input
+                  name="name"
+                  required
+                  maxLength={120}
+                  autoComplete="off"
+                  defaultValue={suggestTemplateCloneName(
+                    cloningTemplate.name,
+                    templates.map((template) => template.name),
+                  )}
+                  className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
+                />
+              </label>
+
+              <label className="mt-5 block text-sm font-semibold">
+                Description
+                <textarea
+                  name="description"
+                  maxLength={1000}
+                  rows={3}
+                  defaultValue={cloningTemplate.description ?? ""}
+                  className="mt-2 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 py-2 font-normal"
+                />
+              </label>
+
+              <MutationMessage message={message} isError={isError} />
+
+              <div className="mt-6 flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={busyKey !== ""}
+                  onClick={() => cloneTemplateDialogRef.current?.close()}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={busyKey !== "" || activeEventTypes.length === 0}
+                >
+                  {busyKey === `template-clone:${cloningTemplate.id}`
+                    ? "Cloning…"
+                    : "Clone as Draft"}
+                </Button>
+              </div>
+            </form>
+          </>
+        ) : null}
       </dialog>
 
       <dialog

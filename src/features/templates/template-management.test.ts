@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   parseEventTypeManagementInput,
+  parseTemplateCloneInput,
   parseTemplateManagementInput,
+  suggestTemplateCloneName,
 } from "@/features/templates/template-management";
 
 const EVENT_TYPE_ID = "11111111-1111-4111-8111-111111111111";
@@ -143,5 +145,68 @@ describe("Template management input", () => {
         status: "draft",
       }).ok,
     ).toBe(false);
+  });
+});
+
+describe("Template clone input", () => {
+  it("trims clone metadata and normalizes a blank description", () => {
+    expect(
+      parseTemplateCloneInput({
+        eventTypeId: EVENT_TYPE_ID,
+        name: "  Guild League Copy  ",
+        description: "   ",
+      }),
+    ).toEqual({
+      ok: true,
+      value: {
+        eventTypeId: EVENT_TYPE_ID,
+        name: "Guild League Copy",
+        description: null,
+      },
+    });
+  });
+
+  it("rejects an invalid destination Event Type", () => {
+    expect(
+      parseTemplateCloneInput({
+        eventTypeId: "not-a-uuid",
+        name: "Guild League Copy",
+        description: "",
+      }),
+    ).toEqual({
+      ok: false,
+      message: "Choose a valid destination Event Type.",
+    });
+  });
+
+  it("suggests a case-insensitive unique copy name", () => {
+    expect(
+      suggestTemplateCloneName("Guild League", [
+        "Guild League",
+        "guild league copy",
+        "Guild League Copy 2",
+      ]),
+    ).toBe("Guild League Copy 3");
+  });
+
+  it("normalizes an already-cloned source name", () => {
+    expect(
+      suggestTemplateCloneName("Guild League Copy", [
+        "Guild League",
+        "Guild League Copy",
+      ]),
+    ).toBe("Guild League Copy 2");
+
+    expect(
+      suggestTemplateCloneName("Guild League Copy 2", [
+        "Guild League",
+        "Guild League Copy",
+        "Guild League Copy 2",
+      ]),
+    ).toBe("Guild League Copy 3");
+  });
+
+  it("keeps suggested clone names within the schema limit", () => {
+    expect(suggestTemplateCloneName("x".repeat(120), [])).toHaveLength(120);
   });
 });

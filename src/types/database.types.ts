@@ -700,6 +700,9 @@ isOneToOne: false
 "bulk_update_roster_characters":
 { Args: { "p_action": string,"p_character_ids": (string)[],"p_value": string }; Returns: number
                            },
+"clone_event_template":
+{ Args: { "p_description"?: string,"p_event_type_id": string,"p_name": string,"p_source_template_id": string }; Returns: string
+                           },
 "create_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_guild_id": string,"p_name": string,"p_uses_areas"?: boolean }; Returns: string
                            },
