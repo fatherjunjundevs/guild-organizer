@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ import {
 } from "@/features/templates/template-readiness";
 import type { TemplateStructureSummary } from "@/features/templates/structure-server";
 import {
+  PARTY_MAX_SEAT_COUNT,
   PARTY_SEAT_COUNT,
   TEAM_MAX_PARTIES,
   moveOrderedId,
@@ -52,6 +53,7 @@ type EditorTarget =
       name: string;
       sortOrder: number;
       partyCount: number;
+      seatCount: number;
       roleLabel: string;
       internalName: string;
     }
@@ -63,17 +65,20 @@ type EditorTarget =
       name: string;
       sortOrder: number;
       partyCount: number;
+      seatCount: number;
       roleLabel: string;
       internalName: string;
     }
   | {
-      mode: "edit";
+      mode: "create" | "edit";
       kind: "party";
-      id: string;
+      id: string | null;
       parentId: string;
       name: string;
       sortOrder: number;
       partyCount: number;
+      seatCount: number;
+      originalSeatCount: number;
       roleLabel: string;
       internalName: string;
     }
@@ -85,6 +90,7 @@ type EditorTarget =
       name: string;
       sortOrder: number;
       partyCount: number;
+      seatCount: number;
       roleLabel: string;
       internalName: string;
     };
@@ -204,9 +210,17 @@ export function TemplateStructureDesigner({
   const [readinessBusy, setReadinessBusy] = useState<"" | "inspect" | "activate">("");
   const [readinessMessage, setReadinessMessage] = useState("");
   const [readinessError, setReadinessError] = useState(false);
+  const [seatReductionPending, setSeatReductionPending] = useState<number | null>(null);
+  const structureScrollRestoreRef = useRef<{
+    windowX: number;
+    windowY: number;
+    boards: Array<{ key: string; left: number; top: number }>;
+  } | null>(null);
 
   const readOnly = template.status === "archived";
   const reorderBusy = busyKey.startsWith("reorder-");
+  const visuallyStableBusy =
+    reorderBusy || busyKey.startsWith("delete:");
   const structureCount =
     template.areaCount +
     template.sectionCount +
@@ -230,6 +244,32 @@ export function TemplateStructureDesigner({
 
     return () => window.cancelAnimationFrame(frame);
   }, [template.tree]);
+
+  useLayoutEffect(() => {
+    const snapshot = structureScrollRestoreRef.current;
+    if (!snapshot) return;
+
+    window.scrollTo(snapshot.windowX, snapshot.windowY);
+
+    for (const board of snapshot.boards) {
+      const element = document.querySelector<HTMLElement>(
+        `[data-preserve-structure-scroll="${CSS.escape(board.key)}"]`,
+      );
+
+      if (!element) continue;
+      element.scrollLeft = board.left;
+      element.scrollTop = board.top;
+    }
+
+    structureScrollRestoreRef.current = null;
+  }, [
+    template.tree,
+    template.status,
+    template.areaCount,
+    template.sectionCount,
+    template.partyCount,
+    template.slotCount,
+  ]);
 
   // Phase 4.2B2 no button blink v2.4
   // Phase 4.2B2 drop settle v2.3
@@ -418,6 +458,27 @@ export function TemplateStructureDesigner({
     });
   }
 
+  function refreshStructurePreservingPosition() {
+    const boards = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        "[data-preserve-structure-scroll]",
+      ),
+    ).flatMap((element) => {
+      const key = element.getAttribute("data-preserve-structure-scroll");
+      return key
+        ? [{ key, left: element.scrollLeft, top: element.scrollTop }]
+        : [];
+    });
+
+    structureScrollRestoreRef.current = {
+      windowX: window.scrollX,
+      windowY: window.scrollY,
+      boards,
+    };
+
+    router.refresh();
+  }
+
   function clearMessage() {
     setMessage("");
     setIsError(false);
@@ -508,6 +569,7 @@ export function TemplateStructureDesigner({
 
   function showEditor(target: EditorTarget) {
     clearMessage();
+    setSeatReductionPending(null);
     setEditor(target);
     window.requestAnimationFrame(() => {
       editorDialogRef.current?.showModal();
@@ -523,6 +585,7 @@ export function TemplateStructureDesigner({
       name: "",
       sortOrder: 0,
       partyCount: TEAM_MAX_PARTIES,
+      seatCount: PARTY_SEAT_COUNT,
       roleLabel: "",
       internalName: "",
     });
@@ -537,6 +600,23 @@ export function TemplateStructureDesigner({
       name: "",
       sortOrder: 0,
       partyCount: TEAM_MAX_PARTIES,
+      seatCount: PARTY_SEAT_COUNT,
+      roleLabel: "",
+      internalName: "",
+    });
+  }
+
+  function openCreateParty(team: TemplateSectionNode) {
+    showEditor({
+      mode: "create",
+      kind: "party",
+      id: null,
+      parentId: team.id,
+      name: "",
+      sortOrder: team.parties.length,
+      partyCount: 0,
+      seatCount: PARTY_SEAT_COUNT,
+      originalSeatCount: PARTY_SEAT_COUNT,
       roleLabel: "",
       internalName: "",
     });
@@ -551,6 +631,7 @@ export function TemplateStructureDesigner({
       name: area.name,
       sortOrder: area.sortOrder,
       partyCount: TEAM_MAX_PARTIES,
+      seatCount: PARTY_SEAT_COUNT,
       roleLabel: "",
       internalName: "",
     });
@@ -565,6 +646,7 @@ export function TemplateStructureDesigner({
       name: team.name,
       sortOrder: team.sortOrder,
       partyCount: team.parties.length || TEAM_MAX_PARTIES,
+      seatCount: PARTY_SEAT_COUNT,
       roleLabel: "",
       internalName: "",
     });
@@ -579,6 +661,8 @@ export function TemplateStructureDesigner({
       name: party.name,
       sortOrder: party.sortOrder,
       partyCount: 0,
+      seatCount: party.slots.length,
+      originalSeatCount: party.slots.length,
       roleLabel: "",
       internalName: "",
     });
@@ -596,6 +680,7 @@ export function TemplateStructureDesigner({
       name: "",
       sortOrder: seat.sortOrder,
       partyCount: 0,
+      seatCount: PARTY_SEAT_COUNT,
       roleLabel: seat.roleLabel ?? "",
       internalName: seat.name,
     });
@@ -679,6 +764,7 @@ export function TemplateStructureDesigner({
 
       if (editor.mode === "create") {
         data.set("partyCount", String(editor.partyCount));
+        data.set("seatCount", String(editor.seatCount));
         setBusyKey("create:team");
         result = await createTemplateTeamAction(data);
       } else {
@@ -688,12 +774,36 @@ export function TemplateStructureDesigner({
         result = await updateTemplateTeamAction(data);
       }
     } else if (editor.kind === "party") {
-      data.set("partyId", editor.id);
       data.set("sectionId", editor.parentId);
-      data.set("name", editor.name);
-      data.set("sortOrder", String(editor.sortOrder));
-      setBusyKey("edit:party");
-      result = await updateTemplatePartyAction(data);
+
+      if (editor.mode === "create") {
+        data.set("seatCount", String(editor.seatCount));
+        setBusyKey("create:party");
+        result = await addTemplatePartyAction(data);
+      } else {
+        const isSeatReduction =
+          editor.seatCount < editor.originalSeatCount;
+
+        if (
+          isSeatReduction &&
+          seatReductionPending !== editor.seatCount
+        ) {
+          setSeatReductionPending(editor.seatCount);
+          clearMessage();
+          return;
+        }
+
+        data.set("partyId", editor.id ?? "");
+        data.set("name", editor.name);
+        data.set("sortOrder", String(editor.sortOrder));
+        data.set("seatCount", String(editor.seatCount));
+        data.set(
+          "allowRoleRemoval",
+          isSeatReduction ? "true" : "false",
+        );
+        setBusyKey("edit:party");
+        result = await updateTemplatePartyAction(data);
+      }
     } else {
       data.set("slotId", editor.id);
       data.set("partyId", editor.parentId);
@@ -710,26 +820,8 @@ export function TemplateStructureDesigner({
 
     editorDialogRef.current?.close();
     setEditor(null);
-    router.refresh();
-  }
-
-  async function addParty(team: TemplateSectionNode) {
-    invalidateInspection();
-    const data = new FormData();
-    data.set("guildId", guildId);
-    data.set("templateId", template.id);
-    data.set("sectionId", team.id);
-
-    setBusyKey(`add-party:${team.id}`);
-    clearMessage();
-
-    const result = await addTemplatePartyAction(data);
-
-    setBusyKey("");
-
-    if (applyResult(result)) {
-      router.refresh();
-    }
+    setSeatReductionPending(null);
+    refreshStructurePreservingPosition();
   }
 
   function appendOrderedIds(data: FormData, ids: string[]) {
@@ -873,7 +965,7 @@ export function TemplateStructureDesigner({
     }
 
     setPendingDelete(null);
-    router.refresh();
+    refreshStructurePreservingPosition();
   }
 
   function teamsForRender(
@@ -1035,7 +1127,6 @@ export function TemplateStructureDesigner({
     party: TemplatePartyNode,
     team: TemplateSectionNode,
   ) {
-    const seatCountCorrect = party.slots.length === PARTY_SEAT_COUNT;
     const partyIndex = team.parties.findIndex(
       (sibling) => sibling.id === party.id,
     );
@@ -1168,13 +1259,6 @@ export function TemplateStructureDesigner({
           </>
         ) : null}
 
-        {!seatCountCorrect ? (
-          <p className="mt-2 text-xs font-semibold text-[var(--warning)]">
-            This older Party has {party.slots.length} seat rows. Team Board
-            Parties normally use {PARTY_SEAT_COUNT}.
-          </p>
-        ) : null}
-
         <div className="mt-3 grid gap-2">
           {party.slots.map((seat) => renderSeat(seat, party.id))}
         </div>
@@ -1233,8 +1317,9 @@ export function TemplateStructureDesigner({
               </StatusChip>
             </div>
             <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-              Each new Party automatically receives {PARTY_SEAT_COUNT} seats.
-              Seat numbers are internal and hidden from the board.
+              New Parties can use 1–{PARTY_MAX_SEAT_COUNT} seats
+              ({PARTY_SEAT_COUNT} by default). Seat numbers are internal and
+              hidden from the board.
             </p>
           </div>
 
@@ -1298,13 +1383,9 @@ export function TemplateStructureDesigner({
                 size="sm"
                 variant="secondary"
                 disabled={busyKey !== "" || partyLimitReached}
-                onClick={() => addParty(team)}
+                onClick={() => openCreateParty(team)}
               >
-                {busyKey === `add-party:${team.id}`
-                  ? "Adding…"
-                  : partyLimitReached
-                    ? "8 Parties Max"
-                    : "Add Party"}
+                {partyLimitReached ? "8 Parties Max" : "Add Party"}
               </Button>
               <Button
                 type="button"
@@ -1331,6 +1412,7 @@ export function TemplateStructureDesigner({
         {team.parties.length > 0 ? (
           <div
             className="mt-4 min-w-0 w-full max-w-full overflow-x-auto overscroll-x-contain pb-2"
+            data-preserve-structure-scroll={`party-board:${team.id}`}
             aria-label={`${team.name} Party board`}
           >
             <div className="flex min-w-max gap-3">
@@ -1341,8 +1423,7 @@ export function TemplateStructureDesigner({
           <div className="mt-4 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-default)] p-5">
             <p className="font-semibold">No Parties in this Team</p>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Add a Party and its five seat rows will be created
-              automatically.
+              Add a Party and choose how many seat rows it should contain.
             </p>
             {!readOnly ? (
               <Button
@@ -1350,7 +1431,7 @@ export function TemplateStructureDesigner({
                 size="sm"
                 variant="secondary"
                 className="mt-3"
-                onClick={() => addParty(team)}
+                onClick={() => openCreateParty(team)}
               >
                 Add first Party
               </Button>
@@ -1496,8 +1577,8 @@ export function TemplateStructureDesigner({
 
   return (
     <div
-      className={`min-w-0 overflow-x-hidden px-5 py-8 sm:px-8 lg:px-10 ${
-        reorderBusy ? "[&_button:disabled]:opacity-100" : ""
+      className={`min-w-0 overflow-x-hidden px-5 py-8 sm:px-8 lg:px-10 [overflow-anchor:none] ${
+        visuallyStableBusy ? "[&_button:disabled]:opacity-100" : ""
       }`}
     >
       <div className="mx-auto min-w-0 max-w-[96rem]">
@@ -1529,10 +1610,11 @@ export function TemplateStructureDesigner({
             </h1>
             <p className="mt-2 max-w-4xl leading-7 text-[var(--text-secondary)]">
               Build reusable Teams for {guildName}. A Team can contain up to{" "}
-              {TEAM_MAX_PARTIES} Parties, and every new Party receives{" "}
-              {PARTY_SEAT_COUNT} seats automatically. Seat numbers stay
-              internal, so organizers work with a board instead of typing
-              Seat 1–5.
+              {TEAM_MAX_PARTIES} Parties, and each Party can use 1–{" "}
+              {PARTY_MAX_SEAT_COUNT} seats. New Parties default to{" "}
+              {PARTY_SEAT_COUNT} seats. Seat numbers stay internal, so
+              organizers work with the board instead of creating seat rows
+              manually.
             </p>
           </div>
 
@@ -1717,8 +1799,8 @@ export function TemplateStructureDesigner({
             </h2>
             <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--text-secondary)]">
               Future Event building can render these Teams as Party columns
-              with five assignment cells, matching the roster-board style
-              you use in-game. Multiple Teams can live inside the same
+              with the configured number of assignment cells, matching the
+              roster-board style you use in-game. Multiple Teams can live inside the same
               Template. Drag on desktop, or use the arrow controls on
               touch and keyboard devices, to reorder Teams and Parties.
             </p>
@@ -1748,7 +1830,7 @@ export function TemplateStructureDesigner({
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
                 {template.usesAreas
                   ? "Create an Area first, then add one or more Teams inside it."
-                  : `Create a Team and choose 1–${TEAM_MAX_PARTIES} Parties. Each Party gets ${PARTY_SEAT_COUNT} seats automatically.`}
+                  : `Create a Team, choose 1–${TEAM_MAX_PARTIES} Parties, and choose 1–${PARTY_MAX_SEAT_COUNT} seats per Party.`}
               </p>
               {!readOnly ? (
                 <Button
@@ -1784,6 +1866,7 @@ export function TemplateStructureDesigner({
         onClose={() => {
           setEditor(null);
           setBusyKey("");
+          setSeatReductionPending(null);
         }}
         className="m-auto w-[min(34rem,calc(100vw-2rem))] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-1)] p-0 text-[var(--text-primary)] shadow-2xl shadow-black/50 outline-none backdrop:bg-black/70"
       >
@@ -1803,7 +1886,7 @@ export function TemplateStructureDesigner({
                   {editor.kind === "seat"
                     ? "Seat role requirement"
                     : editor.mode === "create"
-                      ? `Create ${editor.kind === "team" ? "Team" : "Area"}`
+                      ? `Create ${editor.kind === "team" ? "Team" : editor.kind === "party" ? "Party" : "Area"}`
                       : `Rename ${editor.kind === "team" ? "Team" : editor.kind === "party" ? "Party" : "Area"}`}
                 </h2>
               </div>
@@ -1819,7 +1902,8 @@ export function TemplateStructureDesigner({
             </div>
 
             <form onSubmit={submitEditor} className="p-5">
-              {editor.kind !== "seat" ? (
+              {editor.kind !== "seat" &&
+              !(editor.kind === "party" && editor.mode === "create") ? (
                 <label className="text-sm font-semibold">
                   {editor.kind === "team"
                     ? "Team name"
@@ -1878,16 +1962,82 @@ export function TemplateStructureDesigner({
               )}
 
               {editor.kind === "team" && editor.mode === "create" ? (
-                <label className="mt-5 block text-sm font-semibold">
-                  Starting Parties
+                <>
+                  <label className="mt-5 block text-sm font-semibold">
+                    Starting Parties
+                    <select
+                      value={editor.partyCount}
+                      onChange={(event) =>
+                        setEditor((current) =>
+                          current && current.kind === "team"
+                            ? {
+                                ...current,
+                                partyCount: Number(event.target.value),
+                              }
+                            : current,
+                        )
+                      }
+                      className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
+                    >
+                      {Array.from(
+                        { length: TEAM_MAX_PARTIES },
+                        (_, index) => index + 1,
+                      ).map((count) => (
+                        <option key={count} value={count}>
+                          {count} Part{count === 1 ? "y" : "ies"} ·{" "}
+                          {count * editor.seatCount} total seats
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="mt-5 block text-sm font-semibold">
+                    Seats per Party
+                    <select
+                      value={editor.seatCount}
+                      onChange={(event) =>
+                        setEditor((current) =>
+                          current && current.kind === "team"
+                            ? {
+                                ...current,
+                                seatCount: Number(event.target.value),
+                              }
+                            : current,
+                        )
+                      }
+                      className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
+                    >
+                      {Array.from(
+                        { length: PARTY_MAX_SEAT_COUNT },
+                        (_, index) => index + 1,
+                      ).map((count) => (
+                        <option key={count} value={count}>
+                          {count} seat{count === 1 ? "" : "s"} per Party
+                          {count === PARTY_SEAT_COUNT ? " · default" : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="mt-2 block text-xs font-normal leading-5 text-[var(--text-tertiary)]">
+                      Every starting Party uses this seat count. You can add
+                      Parties later with their own seat counts until the Team
+                      reaches {TEAM_MAX_PARTIES}.
+                    </span>
+                  </label>
+                </>
+              ) : null}
+
+              {editor.kind === "party" && editor.mode === "create" ? (
+                <label className="text-sm font-semibold">
+                  Seats in new Party
                   <select
-                    value={editor.partyCount}
+                    autoFocus
+                    value={editor.seatCount}
                     onChange={(event) =>
                       setEditor((current) =>
-                        current && current.kind === "team"
+                        current && current.kind === "party"
                           ? {
                               ...current,
-                              partyCount: Number(event.target.value),
+                              seatCount: Number(event.target.value),
                             }
                           : current,
                       )
@@ -1895,21 +2045,74 @@ export function TemplateStructureDesigner({
                     className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
                   >
                     {Array.from(
-                      { length: TEAM_MAX_PARTIES },
+                      { length: PARTY_MAX_SEAT_COUNT },
                       (_, index) => index + 1,
                     ).map((count) => (
                       <option key={count} value={count}>
-                        {count} Part{count === 1 ? "y" : "ies"} ·{" "}
-                        {count * PARTY_SEAT_COUNT} seats
+                        {count} seat{count === 1 ? "" : "s"}
+                        {count === PARTY_SEAT_COUNT ? " · default" : ""}
                       </option>
                     ))}
                   </select>
                   <span className="mt-2 block text-xs font-normal leading-5 text-[var(--text-tertiary)]">
-                    Every Party is created with {PARTY_SEAT_COUNT} seats.
-                    You can add Parties later until the Team reaches{" "}
-                    {TEAM_MAX_PARTIES}.
+                    The Party name is assigned automatically. Seat numbers stay
+                    internal and can receive individual role requirements.
                   </span>
                 </label>
+              ) : null}
+
+              {editor.kind === "party" && editor.mode === "edit" ? (
+                <div className="mt-5">
+                  <label className="block text-sm font-semibold">
+                    Seat count
+                    <select
+                      value={editor.seatCount}
+                      onChange={(event) => {
+                        setSeatReductionPending(null);
+                        setEditor((current) =>
+                          current && current.kind === "party"
+                            ? {
+                                ...current,
+                                seatCount: Number(event.target.value),
+                              }
+                            : current,
+                        );
+                      }}
+                      className="mt-2 h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--bg-base)] px-3 font-normal"
+                    >
+                      {Array.from(
+                        { length: PARTY_MAX_SEAT_COUNT },
+                        (_, index) => index + 1,
+                      ).map((count) => (
+                        <option key={count} value={count}>
+                          {count} seat{count === 1 ? "" : "s"}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {editor.seatCount < editor.originalSeatCount ? (
+                    <div className="mt-3 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_8%,transparent)] p-3">
+                      <p className="text-sm font-semibold text-[var(--danger)]">
+                        This removes {editor.originalSeatCount - editor.seatCount}{" "}
+                        trailing seat
+                        {editor.originalSeatCount - editor.seatCount === 1
+                          ? ""
+                          : "s"}.
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
+                        Existing earlier seats and their role requirements stay
+                        intact. Any role requirement on a removed trailing seat
+                        is deleted with that seat.
+                      </p>
+                      {seatReductionPending === editor.seatCount ? (
+                        <p className="mt-2 text-xs font-semibold text-[var(--danger)]">
+                          Confirm the removal with the button below.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               <MutationMessage message={message} isError={isError} />
@@ -1925,9 +2128,18 @@ export function TemplateStructureDesigner({
                 </Button>
                 <Button
                   type="submit"
+                  variant={
+                    editor.kind === "party" &&
+                    editor.mode === "edit" &&
+                    editor.seatCount < editor.originalSeatCount &&
+                    seatReductionPending === editor.seatCount
+                      ? "danger"
+                      : "primary"
+                  }
                   disabled={
                     busyKey !== "" ||
                     (editor.kind !== "seat" &&
+                      !(editor.kind === "party" && editor.mode === "create") &&
                       editor.name.trim().length === 0)
                   }
                 >
@@ -1935,9 +2147,14 @@ export function TemplateStructureDesigner({
                     ? "Saving…"
                     : editor.kind === "seat"
                       ? "Save Role"
-                      : editor.mode === "create"
-                        ? "Create"
-                        : "Save"}
+                      : editor.kind === "party" &&
+                          editor.mode === "edit" &&
+                          editor.seatCount < editor.originalSeatCount &&
+                          seatReductionPending === editor.seatCount
+                        ? `Confirm remove ${editor.originalSeatCount - editor.seatCount} seat${editor.originalSeatCount - editor.seatCount === 1 ? "" : "s"}`
+                        : editor.mode === "create"
+                          ? "Create"
+                          : "Save"}
                 </Button>
               </div>
             </form>

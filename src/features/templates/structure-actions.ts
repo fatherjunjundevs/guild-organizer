@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   PARTY_SEAT_COUNT,
+  parsePartySeatCount,
   parseTeamPartyCount,
   parseTemplateSlotRoleLabel,
   parseTemplateStructureName,
@@ -205,6 +206,12 @@ export async function createTemplateTeamAction(
 
   if (!partyCount.ok) return partyCount;
 
+  const seatCount = parsePartySeatCount(
+    getString(formData, "seatCount") || String(PARTY_SEAT_COUNT),
+  );
+
+  if (!seatCount.ok) return seatCount;
+
   const args: {
     p_template_id: string;
     p_name: string;
@@ -215,7 +222,7 @@ export async function createTemplateTeamAction(
     p_template_id: scope.templateId,
     p_name: name.value,
     p_party_count: partyCount.value,
-    p_seat_count: PARTY_SEAT_COUNT,
+    p_seat_count: seatCount.value,
   };
 
   if (areaId) {
@@ -236,7 +243,7 @@ export async function createTemplateTeamAction(
 
   return {
     ok: true,
-    message: `${name.value} Team was created with ${partyCount.value} Parties and ${PARTY_SEAT_COUNT} seats per Party.`,
+    message: `${name.value} Team was created with ${partyCount.value} Parties and ${seatCount.value} seat${seatCount.value === 1 ? "" : "s"} per Party.`,
     id: sectionId,
   };
 }
@@ -251,12 +258,18 @@ export async function addTemplatePartyAction(
     return { ok: false, message: "The Team identifiers are invalid." };
   }
 
+  const seatCount = parsePartySeatCount(
+    getString(formData, "seatCount") || String(PARTY_SEAT_COUNT),
+  );
+
+  if (!seatCount.ok) return seatCount;
+
   const supabase = await createClient();
   const { data: partyId, error } = await supabase.rpc(
     "create_event_template_party_with_slots",
     {
       p_section_id: sectionId,
-      p_seat_count: PARTY_SEAT_COUNT,
+      p_seat_count: seatCount.value,
     },
   );
 
@@ -268,7 +281,7 @@ export async function addTemplatePartyAction(
 
   return {
     ok: true,
-    message: `Party added with ${PARTY_SEAT_COUNT} seats.`,
+    message: `Party added with ${seatCount.value} seat${seatCount.value === 1 ? "" : "s"}.`,
     id: partyId,
   };
 }
@@ -364,10 +377,9 @@ export async function updateTemplatePartyAction(
 ): Promise<TemplateStructureMutationResult> {
   const scope = validateScope(formData);
   const partyId = getUuid(formData, "partyId");
-  const sectionId = getUuid(formData, "sectionId");
   const sortOrder = getSortOrder(formData);
 
-  if (!scope || !partyId || !sectionId || sortOrder === null) {
+  if (!scope || !partyId || sortOrder === null) {
     return { ok: false, message: "The Party identifiers are invalid." };
   }
 
@@ -378,15 +390,36 @@ export async function updateTemplatePartyAction(
 
   if (!name.ok) return name;
 
+  const seatCount = parsePartySeatCount(
+    getString(formData, "seatCount"),
+  );
+
+  if (!seatCount.ok) return seatCount;
+
+  const allowRoleRemoval =
+    getString(formData, "allowRoleRemoval") === "true";
+
   const supabase = await createClient();
-  const { error } = await supabase.rpc("update_event_template_party", {
-    p_party_id: partyId,
-    p_section_id: sectionId,
-    p_name: name.value,
-    p_sort_order: sortOrder,
-  });
+  const { error } = await supabase.rpc(
+    "update_event_template_party_layout",
+    {
+      p_party_id: partyId,
+      p_name: name.value,
+      p_sort_order: sortOrder,
+      p_seat_count: seatCount.value,
+      p_allow_role_removal: allowRoleRemoval,
+    },
+  );
 
   if (error) {
+    if (error.code === "23514" && !allowRoleRemoval) {
+      return {
+        ok: false,
+        message:
+          "Reducing this Party would remove seat rows with role requirements. Confirm the seat reduction to continue.",
+      };
+    }
+
     return { ok: false, message: mapStructureRpcError(error.code) };
   }
 
@@ -394,7 +427,7 @@ export async function updateTemplatePartyAction(
 
   return {
     ok: true,
-    message: `${name.value} was updated.`,
+    message: `${name.value} was updated with ${seatCount.value} seat${seatCount.value === 1 ? "" : "s"}.`,
     id: partyId,
   };
 }

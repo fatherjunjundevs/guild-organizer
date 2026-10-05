@@ -845,6 +845,9 @@ isOneToOne: false
 "update_event_template_party":
 { Args: { "p_name": string,"p_party_id": string,"p_section_id": string,"p_sort_order": number }; Returns: undefined
                            },
+"update_event_template_party_layout":
+{ Args: { "p_allow_role_removal"?: boolean,"p_name": string,"p_party_id": string,"p_seat_count": number,"p_sort_order": number }; Returns: undefined
+                           },
 "update_event_template_section":
 { Args: { "p_area_id": string,"p_name": string,"p_section_id": string,"p_sort_order": number }; Returns: undefined
                            },

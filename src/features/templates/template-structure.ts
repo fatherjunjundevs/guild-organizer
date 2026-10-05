@@ -1,5 +1,7 @@
 export const TEAM_MAX_PARTIES = 8;
+export const PARTY_MIN_SEAT_COUNT = 1;
 export const PARTY_SEAT_COUNT = 5;
+export const PARTY_MAX_SEAT_COUNT = 8;
 
 export type TemplateStructureKind =
   | "area"
@@ -113,6 +115,32 @@ export function parseTeamPartyCount(
     return {
       ok: false,
       message: `Party count must be between 1 and ${TEAM_MAX_PARTIES}.`,
+    };
+  }
+
+  return { ok: true, value: parsed };
+}
+
+export function parsePartySeatCount(
+  value: string,
+): ParseResult<number> {
+  if (!/^\d+$/.test(value)) {
+    return {
+      ok: false,
+      message: `Seat count must be between ${PARTY_MIN_SEAT_COUNT} and ${PARTY_MAX_SEAT_COUNT}.`,
+    };
+  }
+
+  const parsed = Number(value);
+
+  if (
+    !Number.isSafeInteger(parsed) ||
+    parsed < PARTY_MIN_SEAT_COUNT ||
+    parsed > PARTY_MAX_SEAT_COUNT
+  ) {
+    return {
+      ok: false,
+      message: `Seat count must be between ${PARTY_MIN_SEAT_COUNT} and ${PARTY_MAX_SEAT_COUNT}.`,
     };
   }
 

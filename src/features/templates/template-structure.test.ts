@@ -4,6 +4,7 @@ import {
   moveOrderedId,
   reorderOrderedIdsToTarget,
   parseTeamPartyCount,
+  parsePartySeatCount,
   parseTemplateSlotRoleLabel,
   parseTemplateStructureName,
 } from "@/features/templates/template-structure";
@@ -57,6 +58,19 @@ describe("Template structure input", () => {
     expect(parseTeamPartyCount("0").ok).toBe(false);
     expect(parseTeamPartyCount("9").ok).toBe(false);
     expect(parseTeamPartyCount("4.5").ok).toBe(false);
+  });
+
+  it("accepts Party seat counts from 1 through 8", () => {
+    expect(parsePartySeatCount("1")).toEqual({ ok: true, value: 1 });
+    expect(parsePartySeatCount("5")).toEqual({ ok: true, value: 5 });
+    expect(parsePartySeatCount("8")).toEqual({ ok: true, value: 8 });
+  });
+
+  it("rejects Party seat counts outside 1 through 8", () => {
+    expect(parsePartySeatCount("0").ok).toBe(false);
+    expect(parsePartySeatCount("9").ok).toBe(false);
+    expect(parsePartySeatCount("4.5").ok).toBe(false);
+    expect(parsePartySeatCount("").ok).toBe(false);
   });
 });
 
