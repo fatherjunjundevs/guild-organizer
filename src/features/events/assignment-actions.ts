@@ -37,10 +37,6 @@ function mapAssignmentRpcError(code: string | undefined) {
   return "The assignment could not be saved.";
 }
 
-function eventPath(guildId: string, eventId: string) {
-  return `/app/guild/${guildId}/events/${eventId}`;
-}
-
 export async function assignEventSlotAction(
   formData: FormData,
 ): Promise<EventAssignmentMutationResult> {
@@ -68,7 +64,8 @@ export async function assignEventSlotAction(
     return { ok: false, message: mapAssignmentRpcError(error.code) };
   }
 
-  revalidatePath(eventPath(guildId, eventId));
+  // The Event Builder updates assignments optimistically. Revalidating the
+  // current route here would remount it and erase immediate warning/toast state.
   revalidatePath(`/app/guild/${guildId}/events`);
 
   return { ok: true, message: "Character assigned." };
@@ -146,7 +143,8 @@ export async function clearEventSlotAction(
     return { ok: false, message: mapAssignmentRpcError(error.code) };
   }
 
-  revalidatePath(eventPath(guildId, eventId));
+  // The Event Builder updates assignments optimistically. Revalidating the
+  // current route here would remount it and erase immediate warning/toast state.
   revalidatePath(`/app/guild/${guildId}/events`);
 
   return { ok: true, message: "Character removed." };

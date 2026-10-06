@@ -80,6 +80,63 @@ export function mapAssignmentsBySlot(
   return assignments;
 }
 
+
+export function applyEventSlotAssignment(
+  characters: EventBuilderCharacter[],
+  slotId: string,
+  characterId: string,
+) {
+  if (!slotId || !characterId) return characters;
+
+  const selectedCharacter = characters.find(
+    (character) => character.id === characterId,
+  );
+
+  if (!selectedCharacter) return characters;
+
+  return characters.map((character) => {
+    const withoutTargetSlot = character.assignedSlotIds.filter(
+      (assignedSlotId) => assignedSlotId !== slotId,
+    );
+
+    if (character.id !== characterId) {
+      if (withoutTargetSlot.length === character.assignedSlotIds.length) {
+        return character;
+      }
+
+      return {
+        ...character,
+        assignedSlotIds: withoutTargetSlot,
+      };
+    }
+
+    return {
+      ...character,
+      assignedSlotIds: [...withoutTargetSlot, slotId],
+    };
+  });
+}
+
+export function applyEventSlotClear(
+  characters: EventBuilderCharacter[],
+  slotId: string,
+) {
+  if (!slotId) return characters;
+
+  return characters.map((character) => {
+    if (!character.assignedSlotIds.includes(slotId)) {
+      return character;
+    }
+
+    return {
+      ...character,
+      assignedSlotIds: character.assignedSlotIds.filter(
+        (assignedSlotId) => assignedSlotId !== slotId,
+      ),
+    };
+  });
+}
+
 export type EventSlotDropMode = "move" | "swap" | "same-character";
 
 export function getEventSlotDropMode(

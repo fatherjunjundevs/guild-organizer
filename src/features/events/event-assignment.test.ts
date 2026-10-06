@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterEventBuilderCharacters,
+  applyEventSlotAssignment,
+  applyEventSlotClear,
   applyEventSlotMove,
   getEventSlotDropMode,
   mapAssignmentsBySlot,
@@ -103,6 +105,33 @@ describe("Event Builder assignment roster", () => {
     expect(getEventSlotDropMode("alpha", null)).toBe("move");
     expect(getEventSlotDropMode("alpha", "beta")).toBe("swap");
     expect(getEventSlotDropMode("alpha", "alpha")).toBe("same-character");
+  });
+
+
+  it("optimistically assigns a Character while replacing the current Seat occupant", () => {
+    const withAlphaAssigned = applyEventSlotAssignment(
+      characters,
+      "slot-2",
+      "alpha",
+    );
+
+    expect(
+      withAlphaAssigned.find((character) => character.id === "alpha")
+        ?.assignedSlotIds,
+    ).toEqual(["slot-2"]);
+    expect(
+      withAlphaAssigned.find((character) => character.id === "beta")
+        ?.assignedSlotIds,
+    ).toEqual([]);
+  });
+
+  it("optimistically clears a Seat assignment", () => {
+    const cleared = applyEventSlotClear(characters, "slot-2");
+
+    expect(
+      cleared.find((character) => character.id === "beta")
+        ?.assignedSlotIds,
+    ).toEqual([]);
   });
 
   it("optimistically moves a Character into an open Slot", () => {

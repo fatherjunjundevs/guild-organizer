@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
 import { Surface } from "@/components/ui/surface";
@@ -14,6 +13,8 @@ import {
   type EventAssignmentMutationResult,
 } from "@/features/events/assignment-actions";
 import {
+  applyEventSlotAssignment,
+  applyEventSlotClear,
   applyEventSlotMove,
   filterEventBuilderCharacters,
   getEventSlotDropMode,
@@ -27,6 +28,13 @@ import type {
   EventBuilderSection,
   EventBuilderSlot,
 } from "@/features/events/event-builder";
+import {
+  buildEventBuilderWarningReport,
+  groupEventWarningsBySlot,
+  type EventBuilderPartyStatus,
+  type EventBuilderWarning,
+  type EventBuilderWarningReport,
+} from "@/features/events/event-warnings";
 
 type SelectedSlot = {
   id: string;
@@ -91,6 +99,83 @@ function AssignmentToast({
   );
 }
 
+function LineupChecksPanel({
+  report,
+}: {
+  report: EventBuilderWarningReport;
+}) {
+  const { summary, warnings } = report;
+  const hasWarnings = summary.total > 0;
+
+  const checks = [
+    { label: "Duplicates", value: summary.duplicates },
+    { label: "Missing roles", value: summary.missingRoles },
+    { label: "Role conflicts", value: summary.roleConflicts },
+    { label: "Inactive", value: summary.inactiveAssignments },
+  ];
+
+  return (
+    <Surface level={2} className="mt-4 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold tracking-[0.1em] text-[var(--text-tertiary)] uppercase">
+            Lineup checks
+          </p>
+          <h2 className="mt-1 text-lg font-semibold">
+            Assignment warnings
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            Warnings are advisory while you build. They do not block assignment changes.
+          </p>
+        </div>
+        <StatusChip tone={hasWarnings ? "warning" : "success"}>
+          {hasWarnings
+            ? `${summary.total} warning${summary.total === 1 ? "" : "s"}`
+            : "No warnings"}
+        </StatusChip>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {checks.map((check) => (
+          <div
+            key={check.label}
+            className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-1)] p-3"
+          >
+            <p className="text-[11px] text-[var(--text-tertiary)]">
+              {check.label}
+            </p>
+            <p className="mt-1 text-lg font-semibold">{check.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {warnings.length > 0 ? (
+        <div className="mt-4 max-h-64 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-subtle)]">
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {warnings.map((warning) => (
+              <li key={warning.id} className="px-3 py-3 sm:px-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <StatusChip tone="warning">{warning.title}</StatusChip>
+                  <span className="text-xs text-[var(--text-tertiary)]">
+                    {warning.location}
+                  </span>
+                </div>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  {warning.message}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-[var(--text-secondary)]">
+          No duplicate, required-role, role-conflict, or inactive-assignment warnings.
+        </p>
+      )}
+    </Surface>
+  );
+}
+
 function SeatCard({
   slot,
   assignment,
@@ -102,6 +187,7 @@ function SeatCard({
   draggingCharacterId,
   dropTargetSlotId,
   recentlyChanged,
+  warnings,
   onDragStart,
   onDragEnd,
   onDragEnter,
@@ -117,6 +203,7 @@ function SeatCard({
   draggingCharacterId: string;
   dropTargetSlotId: string;
   recentlyChanged: boolean;
+  warnings: EventBuilderWarning[];
   onDragStart: (
     event: React.DragEvent<HTMLDivElement>,
     slotId: string,
@@ -142,6 +229,7 @@ function SeatCard({
           assignment?.id ?? null,
         )
       : null;
+  const hasWarnings = warnings.length > 0;
 
   return (
     <div
@@ -157,7 +245,7 @@ function SeatCard({
         }
       }}
       onDrop={(event) => onDrop(event, slot.id)}
-      className={`rounded-[var(--radius-md)] border bg-[var(--bg-base)] px-3 py-2.5 transition-[border-color,background-color,box-shadow,opacity] duration-300 ${isDropTarget ? "border-[var(--accent)] bg-[var(--accent-soft)]" : recentlyChanged ? "border-[var(--accent-border)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent-border)]" : "border-[var(--border-subtle)]"} ${isDragging ? "opacity-45" : ""}`}
+      className={`rounded-[var(--radius-md)] border bg-[var(--bg-base)] px-3 py-2.5 transition-[border-color,background-color,box-shadow,opacity] duration-300 ${isDropTarget ? "border-[var(--accent)] bg-[var(--accent-soft)]" : hasWarnings ? "border-[color-mix(in_srgb,var(--warning)_45%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--bg-base)_96%,var(--warning)_4%)]" : recentlyChanged ? "border-[var(--accent-border)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent-border)]" : "border-[var(--border-subtle)]"} ${isDragging ? "opacity-45" : ""}`}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
@@ -188,6 +276,24 @@ function SeatCard({
           </span>
         )}
       </div>
+
+      {hasWarnings && !isDropTarget ? (
+        <div className="mt-2 grid gap-1.5">
+          {warnings.map((warning) => (
+            <div
+              key={warning.id}
+              className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--warning)_30%,transparent)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] px-2.5 py-2"
+            >
+              <p className="text-[11px] font-semibold text-[var(--warning)]">
+                {warning.title}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-4 text-[var(--text-secondary)]">
+                {warning.message}
+              </p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {assignment ? (
         <div
@@ -267,6 +373,8 @@ function TeamBoard({
   draggingCharacterId,
   dropTargetSlotId,
   recentlyChangedSlotIds,
+  warningsBySlot,
+  partyStatusById,
   onDragStart,
   onDragEnd,
   onDragEnter,
@@ -282,6 +390,8 @@ function TeamBoard({
   draggingCharacterId: string;
   dropTargetSlotId: string;
   recentlyChangedSlotIds: ReadonlySet<string>;
+  warningsBySlot: ReadonlyMap<string, EventBuilderWarning[]>;
+  partyStatusById: ReadonlyMap<string, EventBuilderPartyStatus>;
   onDragStart: (
     event: React.DragEvent<HTMLDivElement>,
     slotId: string,
@@ -322,9 +432,21 @@ function TeamBoard({
             >
               <div className="flex items-center justify-between gap-2">
                 <h4 className="truncate text-sm font-semibold">{party.name}</h4>
-                <span className="shrink-0 text-xs text-[var(--text-tertiary)]">
-                  {party.slots.length} seats
-                </span>
+                {(() => {
+                  const status = partyStatusById.get(party.id);
+                  if (!status) return null;
+
+                  return (
+                    <StatusChip
+                      tone={status.status === "full" ? "success" : "warning"}
+                      className="shrink-0"
+                    >
+                      {status.status === "full"
+                        ? "Full"
+                        : `${status.openSeats} open`}
+                    </StatusChip>
+                  );
+                })()}
               </div>
 
               <div className="mt-3 space-y-2">
@@ -349,6 +471,7 @@ function TeamBoard({
                     draggingCharacterId={draggingCharacterId}
                     dropTargetSlotId={dropTargetSlotId}
                     recentlyChanged={recentlyChangedSlotIds.has(slot.id)}
+                    warnings={warningsBySlot.get(slot.id) ?? []}
                     onDragStart={onDragStart}
                     onDragEnd={onDragEnd}
                     onDragEnter={onDragEnter}
@@ -375,6 +498,8 @@ function AreaBoard({
   draggingCharacterId,
   dropTargetSlotId,
   recentlyChangedSlotIds,
+  warningsBySlot,
+  partyStatusById,
   onDragStart,
   onDragEnd,
   onDragEnter,
@@ -390,6 +515,8 @@ function AreaBoard({
   draggingCharacterId: string;
   dropTargetSlotId: string;
   recentlyChangedSlotIds: ReadonlySet<string>;
+  warningsBySlot: ReadonlyMap<string, EventBuilderWarning[]>;
+  partyStatusById: ReadonlyMap<string, EventBuilderPartyStatus>;
   onDragStart: (
     event: React.DragEvent<HTMLDivElement>,
     slotId: string,
@@ -436,6 +563,8 @@ function AreaBoard({
             draggingCharacterId={draggingCharacterId}
             dropTargetSlotId={dropTargetSlotId}
             recentlyChangedSlotIds={recentlyChangedSlotIds}
+            warningsBySlot={warningsBySlot}
+            partyStatusById={partyStatusById}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
             onDragEnter={onDragEnter}
@@ -458,7 +587,6 @@ function EventBuilderBoardContent({
   guildName,
   event,
 }: EventBuilderBoardProps) {
-  const router = useRouter();
   const pickerDialogRef = useRef<HTMLDialogElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -508,6 +636,27 @@ function EventBuilderBoardContent({
     [characters],
   );
 
+  const warningReport = useMemo(
+    () => buildEventBuilderWarningReport(event.structure, characters),
+    [event.structure, characters],
+  );
+
+  const warningsBySlot = useMemo(
+    () => groupEventWarningsBySlot(warningReport.warnings),
+    [warningReport.warnings],
+  );
+
+  const partyStatusById = useMemo(
+    () =>
+      new Map(
+        warningReport.partyStatuses.map((status) => [
+          status.partyId,
+          status,
+        ]),
+      ),
+    [warningReport.partyStatuses],
+  );
+
   const eligibleCharacters = useMemo(
     () => characters.filter((character) => character.status === "active"),
     [characters],
@@ -543,13 +692,14 @@ function EventBuilderBoardContent({
   async function assignCharacter(characterId: string) {
     if (!selectedSlot) return;
 
-    setBusySlotId(selectedSlot.id);
+    const slotId = selectedSlot.id;
+    setBusySlotId(slotId);
     setResult(null);
 
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("eventId", event.id);
-    data.set("slotId", selectedSlot.id);
+    data.set("slotId", slotId);
     data.set("characterId", characterId);
 
     const mutation = await assignEventSlotAction(data);
@@ -558,9 +708,12 @@ function EventBuilderBoardContent({
 
     if (!mutation.ok) return;
 
+    setCharacters((current) =>
+      applyEventSlotAssignment(current, slotId, characterId),
+    );
+    setRecentlyChangedSlotIds([slotId]);
     pickerDialogRef.current?.close();
     setSelectedSlot(null);
-    router.refresh();
   }
 
   async function clearSlot(slotId: string) {
@@ -577,7 +730,8 @@ function EventBuilderBoardContent({
     setResult(mutation);
 
     if (mutation.ok) {
-      router.refresh();
+      setCharacters((current) => applyEventSlotClear(current, slotId));
+      setRecentlyChangedSlotIds([slotId]);
     }
   }
 
@@ -765,6 +919,8 @@ function EventBuilderBoardContent({
           </Surface>
         </div>
 
+        <LineupChecksPanel report={warningReport} />
+
         <AssignmentToast result={selectedSlot ? null : result} />
 
         <div className="mt-8">
@@ -796,6 +952,8 @@ function EventBuilderBoardContent({
                     draggingCharacterId={draggingCharacterId}
                     dropTargetSlotId={dropTargetSlotId}
                     recentlyChangedSlotIds={recentlyChangedSlotSet}
+                    warningsBySlot={warningsBySlot}
+                    partyStatusById={partyStatusById}
                     onDragStart={startSlotDrag}
                     onDragEnd={endSlotDrag}
                     onDragEnter={setDropTargetSlotId}
@@ -823,6 +981,8 @@ function EventBuilderBoardContent({
                   draggingCharacterId={draggingCharacterId}
                   dropTargetSlotId={dropTargetSlotId}
                   recentlyChangedSlotIds={recentlyChangedSlotSet}
+                  warningsBySlot={warningsBySlot}
+                  partyStatusById={partyStatusById}
                   onDragStart={startSlotDrag}
                   onDragEnd={endSlotDrag}
                   onDragEnter={setDropTargetSlotId}
