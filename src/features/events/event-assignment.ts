@@ -79,3 +79,60 @@ export function mapAssignmentsBySlot(
 
   return assignments;
 }
+
+export type EventSlotDropMode = "move" | "swap" | "same-character";
+
+export function getEventSlotDropMode(
+  sourceCharacterId: string,
+  targetCharacterId: string | null,
+): EventSlotDropMode {
+  if (!targetCharacterId) return "move";
+  if (targetCharacterId === sourceCharacterId) return "same-character";
+  return "swap";
+}
+
+export function applyEventSlotMove(
+  characters: EventBuilderCharacter[],
+  sourceSlotId: string,
+  targetSlotId: string,
+) {
+  if (!sourceSlotId || !targetSlotId || sourceSlotId === targetSlotId) {
+    return characters;
+  }
+
+  const sourceCharacter = characters.find((character) =>
+    character.assignedSlotIds.includes(sourceSlotId),
+  );
+
+  if (!sourceCharacter) return characters;
+
+  const targetCharacter = characters.find((character) =>
+    character.assignedSlotIds.includes(targetSlotId),
+  );
+
+  if (targetCharacter?.id === sourceCharacter.id) {
+    return characters;
+  }
+
+  return characters.map((character) => {
+    if (character.id === sourceCharacter.id) {
+      return {
+        ...character,
+        assignedSlotIds: character.assignedSlotIds.map((slotId) =>
+          slotId === sourceSlotId ? targetSlotId : slotId,
+        ),
+      };
+    }
+
+    if (targetCharacter && character.id === targetCharacter.id) {
+      return {
+        ...character,
+        assignedSlotIds: character.assignedSlotIds.map((slotId) =>
+          slotId === targetSlotId ? sourceSlotId : slotId,
+        ),
+      };
+    }
+
+    return character;
+  });
+}

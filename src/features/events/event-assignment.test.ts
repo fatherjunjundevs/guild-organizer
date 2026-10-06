@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   filterEventBuilderCharacters,
+  applyEventSlotMove,
+  getEventSlotDropMode,
   mapAssignmentsBySlot,
   type EventBuilderCharacter,
 } from "@/features/events/event-assignment";
@@ -95,5 +97,51 @@ describe("Event Builder assignment roster", () => {
 
     expect(assignments.get("slot-2")?.ign).toBe("BetaHeal");
     expect(assignments.get("slot-3")?.ign).toBe("FormerMage");
+  });
+
+  it("describes move, swap, and same-Character drop targets", () => {
+    expect(getEventSlotDropMode("alpha", null)).toBe("move");
+    expect(getEventSlotDropMode("alpha", "beta")).toBe("swap");
+    expect(getEventSlotDropMode("alpha", "alpha")).toBe("same-character");
+  });
+
+  it("optimistically moves a Character into an open Slot", () => {
+    const next = applyEventSlotMove(characters, "slot-2", "slot-open");
+
+    expect(
+      next.find((character) => character.id === "beta")?.assignedSlotIds,
+    ).toEqual(["slot-open"]);
+  });
+
+  it("optimistically swaps two occupied Slots", () => {
+    const withAlphaAssigned: EventBuilderCharacter[] = characters.map(
+      (character) =>
+        character.id === "alpha"
+          ? { ...character, assignedSlotIds: ["slot-1"] }
+          : character,
+    );
+
+    const next = applyEventSlotMove(
+      withAlphaAssigned,
+      "slot-1",
+      "slot-2",
+    );
+
+    expect(
+      next.find((character) => character.id === "alpha")?.assignedSlotIds,
+    ).toEqual(["slot-2"]);
+    expect(
+      next.find((character) => character.id === "beta")?.assignedSlotIds,
+    ).toEqual(["slot-1"]);
+  });
+
+  it("keeps duplicate same-Character target drops unchanged", () => {
+    const duplicate: EventBuilderCharacter[] = characters.map((character) =>
+      character.id === "alpha"
+        ? { ...character, assignedSlotIds: ["slot-a", "slot-b"] }
+        : character,
+    );
+
+    expect(applyEventSlotMove(duplicate, "slot-a", "slot-b")).toBe(duplicate);
   });
 });

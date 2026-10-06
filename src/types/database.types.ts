@@ -1021,6 +1021,9 @@ isOneToOne: false
               "created_at": string,"expires_at": string,"generation": number,"invite_id": string,"invite_kind": string,"invite_role": string,"max_uses": number,"status": string,"updated_at": string,"use_count": number
             }[]
                            },
+"move_event_slot_assignment":
+{ Args: { "p_source_slot_id": string,"p_target_slot_id": string }; Returns: string
+                           },
 "preview_generic_roster_import":
 { Args: { "p_guild_id": string,"p_mapped_fields": (string)[],"p_rows": Json }; Returns: {
               "change_kind": string,"changed_fields": (string)[],"character_id": string,"ign": string

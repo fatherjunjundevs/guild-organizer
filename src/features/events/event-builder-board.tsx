@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StatusChip } from "@/components/ui/status-chip";
@@ -9,10 +10,13 @@ import { Surface } from "@/components/ui/surface";
 import {
   assignEventSlotAction,
   clearEventSlotAction,
+  moveEventSlotAssignmentAction,
   type EventAssignmentMutationResult,
 } from "@/features/events/assignment-actions";
 import {
+  applyEventSlotMove,
   filterEventBuilderCharacters,
+  getEventSlotDropMode,
   mapAssignmentsBySlot,
   type EventBuilderCharacter,
   type EventBuilderEvent,
@@ -55,6 +59,38 @@ function AssignmentMessage({
   );
 }
 
+function AssignmentToast({
+  result,
+}: {
+  result: EventAssignmentMutationResult | null;
+}) {
+  if (!result) return null;
+
+  return (
+    <div className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(22rem,calc(100vw-2rem))] sm:right-6 sm:bottom-6">
+      <div
+        role={result.ok ? "status" : "alert"}
+        aria-live={result.ok ? "polite" : "assertive"}
+        className={`rounded-[var(--radius-lg)] border px-4 py-3 shadow-xl backdrop-blur-xl ${
+          result.ok
+            ? "border-[color-mix(in_srgb,var(--success)_40%,transparent)] bg-[color-mix(in_srgb,var(--surface-2)_94%,var(--success)_6%)]"
+            : "border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--surface-2)_94%,var(--danger)_6%)]"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              result.ok ? "bg-[var(--success)]" : "bg-[var(--danger)]"
+            }`}
+          />
+          <p className="min-w-0 text-sm font-semibold">{result.message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SeatCard({
   slot,
   assignment,
@@ -62,6 +98,14 @@ function SeatCard({
   onChoose,
   onClear,
   busySlotId,
+  draggingSlotId,
+  draggingCharacterId,
+  dropTargetSlotId,
+  recentlyChanged,
+  onDragStart,
+  onDragEnd,
+  onDragEnter,
+  onDrop,
 }: {
   slot: EventBuilderSlot;
   assignment: EventBuilderCharacter | undefined;
@@ -69,11 +113,52 @@ function SeatCard({
   onChoose: () => void;
   onClear: () => void;
   busySlotId: string;
+  draggingSlotId: string;
+  draggingCharacterId: string;
+  dropTargetSlotId: string;
+  recentlyChanged: boolean;
+  onDragStart: (
+    event: React.DragEvent<HTMLDivElement>,
+    slotId: string,
+    characterId: string,
+  ) => void;
+  onDragEnd: () => void;
+  onDragEnter: (slotId: string) => void;
+  onDrop: (
+    event: React.DragEvent<HTMLDivElement>,
+    targetSlotId: string,
+  ) => void;
 }) {
   const busy = busySlotId === slot.id;
+  const isDragging = draggingSlotId === slot.id;
+  const isDropTarget =
+    dropTargetSlotId === slot.id &&
+    Boolean(draggingSlotId) &&
+    draggingSlotId !== slot.id;
+  const dropMode =
+    isDropTarget && draggingCharacterId
+      ? getEventSlotDropMode(
+          draggingCharacterId,
+          assignment?.id ?? null,
+        )
+      : null;
 
   return (
-    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)] px-3 py-2.5">
+    <div
+      onDragEnter={() => {
+        if (draggingSlotId && draggingSlotId !== slot.id) {
+          onDragEnter(slot.id);
+        }
+      }}
+      onDragOver={(event) => {
+        if (draggingSlotId && draggingSlotId !== slot.id) {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }
+      }}
+      onDrop={(event) => onDrop(event, slot.id)}
+      className={`rounded-[var(--radius-md)] border bg-[var(--bg-base)] px-3 py-2.5 transition-[border-color,background-color,box-shadow,opacity] duration-300 ${isDropTarget ? "border-[var(--accent)] bg-[var(--accent-soft)]" : recentlyChanged ? "border-[var(--accent-border)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent-border)]" : "border-[var(--border-subtle)]"} ${isDragging ? "opacity-45" : ""}`}
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold">{slot.name}</p>
@@ -82,7 +167,15 @@ function SeatCard({
           </p>
         </div>
 
-        {assignment ? (
+        {isDropTarget ? (
+          <StatusChip tone="accent" className="shrink-0">
+            {dropMode === "swap"
+              ? "Drop to swap"
+              : dropMode === "same-character"
+                ? "Already here"
+                : "Drop to move"}
+          </StatusChip>
+        ) : assignment ? (
           <StatusChip
             tone={assignment.status === "active" ? "accent" : "warning"}
             className="shrink-0"
@@ -97,7 +190,15 @@ function SeatCard({
       </div>
 
       {assignment ? (
-        <div className="mt-3 rounded-[var(--radius-md)] bg-[var(--surface-1)] p-3">
+        <div
+          draggable={!eventArchived && !busy}
+          onDragStart={(event) =>
+            onDragStart(event, slot.id, assignment.id)
+          }
+          onDragEnd={onDragEnd}
+          title={eventArchived ? undefined : "Drag to another Seat to move or swap"}
+          className={`mt-3 rounded-[var(--radius-md)] bg-[var(--surface-1)] p-3 ${!eventArchived && !busy ? "cursor-grab active:cursor-grabbing" : ""}`}
+        >
           <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">{assignment.ign}</p>
@@ -112,25 +213,30 @@ function SeatCard({
           </div>
 
           {!eventArchived ? (
-            <div className="mt-3 flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                disabled={busy}
-                onClick={onChoose}
-              >
-                Change
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                disabled={busy}
-                onClick={onClear}
-              >
-                {busy ? "Clearing…" : "Clear"}
-              </Button>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="hidden text-[11px] font-semibold text-[var(--text-tertiary)] md:inline">
+                ⋮⋮ Drag to move
+              </span>
+              <div className="ml-auto flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={onChoose}
+                >
+                  Change
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={onClear}
+                >
+                  {busy ? "Clearing…" : "Clear"}
+                </Button>
+              </div>
             </div>
           ) : null}
         </div>
@@ -157,6 +263,14 @@ function TeamBoard({
   onChooseSlot,
   onClearSlot,
   busySlotId,
+  draggingSlotId,
+  draggingCharacterId,
+  dropTargetSlotId,
+  recentlyChangedSlotIds,
+  onDragStart,
+  onDragEnd,
+  onDragEnter,
+  onDrop,
 }: {
   section: EventBuilderSection;
   assignments: Map<string, EventBuilderCharacter>;
@@ -164,6 +278,21 @@ function TeamBoard({
   onChooseSlot: (slot: SelectedSlot) => void;
   onClearSlot: (slotId: string) => void;
   busySlotId: string;
+  draggingSlotId: string;
+  draggingCharacterId: string;
+  dropTargetSlotId: string;
+  recentlyChangedSlotIds: ReadonlySet<string>;
+  onDragStart: (
+    event: React.DragEvent<HTMLDivElement>,
+    slotId: string,
+    characterId: string,
+  ) => void;
+  onDragEnd: () => void;
+  onDragEnter: (slotId: string) => void;
+  onDrop: (
+    event: React.DragEvent<HTMLDivElement>,
+    targetSlotId: string,
+  ) => void;
 }) {
   return (
     <Surface level={2} className="min-w-0 p-4 sm:p-5">
@@ -216,6 +345,14 @@ function TeamBoard({
                       })
                     }
                     onClear={() => onClearSlot(slot.id)}
+                    draggingSlotId={draggingSlotId}
+                    draggingCharacterId={draggingCharacterId}
+                    dropTargetSlotId={dropTargetSlotId}
+                    recentlyChanged={recentlyChangedSlotIds.has(slot.id)}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    onDragEnter={onDragEnter}
+                    onDrop={onDrop}
                   />
                 ))}
               </div>
@@ -234,6 +371,14 @@ function AreaBoard({
   onChooseSlot,
   onClearSlot,
   busySlotId,
+  draggingSlotId,
+  draggingCharacterId,
+  dropTargetSlotId,
+  recentlyChangedSlotIds,
+  onDragStart,
+  onDragEnd,
+  onDragEnter,
+  onDrop,
 }: {
   area: EventBuilderArea;
   assignments: Map<string, EventBuilderCharacter>;
@@ -241,6 +386,21 @@ function AreaBoard({
   onChooseSlot: (slot: SelectedSlot) => void;
   onClearSlot: (slotId: string) => void;
   busySlotId: string;
+  draggingSlotId: string;
+  draggingCharacterId: string;
+  dropTargetSlotId: string;
+  recentlyChangedSlotIds: ReadonlySet<string>;
+  onDragStart: (
+    event: React.DragEvent<HTMLDivElement>,
+    slotId: string,
+    characterId: string,
+  ) => void;
+  onDragEnd: () => void;
+  onDragEnter: (slotId: string) => void;
+  onDrop: (
+    event: React.DragEvent<HTMLDivElement>,
+    targetSlotId: string,
+  ) => void;
 }) {
   return (
     <section aria-labelledby={`event-area-${area.id}`}>
@@ -272,6 +432,14 @@ function AreaBoard({
             onChooseSlot={onChooseSlot}
             onClearSlot={onClearSlot}
             busySlotId={busySlotId}
+            draggingSlotId={draggingSlotId}
+            draggingCharacterId={draggingCharacterId}
+            dropTargetSlotId={dropTargetSlotId}
+            recentlyChangedSlotIds={recentlyChangedSlotIds}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
+            onDragEnter={onDragEnter}
+            onDrop={onDrop}
           />
         ))}
       </div>
@@ -279,15 +447,17 @@ function AreaBoard({
   );
 }
 
-export function EventBuilderBoard({
-  guildId,
-  guildName,
-  event,
-}: {
+type EventBuilderBoardProps = {
   guildId: string;
   guildName: string;
   event: EventBuilderEvent;
-}) {
+};
+
+function EventBuilderBoardContent({
+  guildId,
+  guildName,
+  event,
+}: EventBuilderBoardProps) {
   const router = useRouter();
   const pickerDialogRef = useRef<HTMLDialogElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -296,17 +466,51 @@ export function EventBuilderBoard({
   const [query, setQuery] = useState("");
   const [rosterView, setRosterView] = useState<EventRosterView>("unassigned");
   const [busySlotId, setBusySlotId] = useState("");
+  const [draggingSlotId, setDraggingSlotId] = useState("");
+  const [draggingCharacterId, setDraggingCharacterId] = useState("");
+  const [dropTargetSlotId, setDropTargetSlotId] = useState("");
+  const [recentlyChangedSlotIds, setRecentlyChangedSlotIds] = useState<
+    string[]
+  >([]);
+  const [characters, setCharacters] = useState(event.characters);
   const [result, setResult] =
     useState<EventAssignmentMutationResult | null>(null);
 
+  useEffect(() => {
+    if (!result || selectedSlot) return;
+
+    const timeoutId = window.setTimeout(
+      () => setResult(null),
+      result.ok ? 3200 : 5000,
+    );
+
+    return () => window.clearTimeout(timeoutId);
+  }, [result, selectedSlot]);
+
+  useEffect(() => {
+    if (recentlyChangedSlotIds.length === 0) return;
+
+    const timeoutId = window.setTimeout(
+      () => setRecentlyChangedSlotIds([]),
+      850,
+    );
+
+    return () => window.clearTimeout(timeoutId);
+  }, [recentlyChangedSlotIds]);
+
+  const recentlyChangedSlotSet = useMemo(
+    () => new Set(recentlyChangedSlotIds),
+    [recentlyChangedSlotIds],
+  );
+
   const assignments = useMemo(
-    () => mapAssignmentsBySlot(event.characters),
-    [event.characters],
+    () => mapAssignmentsBySlot(characters),
+    [characters],
   );
 
   const eligibleCharacters = useMemo(
-    () => event.characters.filter((character) => character.status === "active"),
-    [event.characters],
+    () => characters.filter((character) => character.status === "active"),
+    [characters],
   );
 
   const unassignedCount = useMemo(
@@ -319,8 +523,8 @@ export function EventBuilderBoard({
 
   const filteredCharacters = useMemo(
     () =>
-      filterEventBuilderCharacters(event.characters, query, rosterView),
-    [event.characters, query, rosterView],
+      filterEventBuilderCharacters(characters, query, rosterView),
+    [characters, query, rosterView],
   );
 
   const visibleCharacters = filteredCharacters.slice(0, 100);
@@ -374,6 +578,79 @@ export function EventBuilderBoard({
 
     if (mutation.ok) {
       router.refresh();
+    }
+  }
+
+  function startSlotDrag(
+    dragEvent: React.DragEvent<HTMLDivElement>,
+    slotId: string,
+    characterId: string,
+  ) {
+    if (eventArchived || busySlotId) return;
+
+    dragEvent.dataTransfer.effectAllowed = "move";
+    dragEvent.dataTransfer.setData("text/plain", slotId);
+    setDraggingSlotId(slotId);
+    setDraggingCharacterId(characterId);
+    setDropTargetSlotId("");
+    setResult(null);
+  }
+
+  function endSlotDrag() {
+    setDraggingSlotId("");
+    setDraggingCharacterId("");
+    setDropTargetSlotId("");
+  }
+
+  async function dropSlot(
+    dragEvent: React.DragEvent<HTMLDivElement>,
+    targetSlotId: string,
+  ) {
+    dragEvent.preventDefault();
+
+    const sourceSlotId =
+      draggingSlotId || dragEvent.dataTransfer.getData("text/plain");
+
+    if (
+      !sourceSlotId ||
+      sourceSlotId === targetSlotId ||
+      eventArchived ||
+      busySlotId
+    ) {
+      endSlotDrag();
+      return;
+    }
+
+    const previousCharacters = characters;
+    const optimisticCharacters = applyEventSlotMove(
+      characters,
+      sourceSlotId,
+      targetSlotId,
+    );
+
+    flushSync(() => {
+      setCharacters(optimisticCharacters);
+      setBusySlotId(targetSlotId);
+      setResult(null);
+      setRecentlyChangedSlotIds([sourceSlotId, targetSlotId]);
+      setDraggingSlotId("");
+      setDraggingCharacterId("");
+      setDropTargetSlotId("");
+    });
+
+    const data = new FormData();
+    data.set("guildId", guildId);
+    data.set("eventId", event.id);
+    data.set("sourceSlotId", sourceSlotId);
+    data.set("targetSlotId", targetSlotId);
+
+    const mutation = await moveEventSlotAssignmentAction(data);
+    setBusySlotId("");
+    setResult(mutation);
+
+    if (!mutation.ok) {
+      setCharacters(previousCharacters);
+      setRecentlyChangedSlotIds([]);
     }
   }
 
@@ -488,16 +765,14 @@ export function EventBuilderBoard({
           </Surface>
         </div>
 
-        <div className="mt-4">
-          <AssignmentMessage result={result} />
-        </div>
+        <AssignmentToast result={selectedSlot ? null : result} />
 
         <div className="mt-8">
           <div className="mb-4">
             <h2 className="text-lg font-semibold">Lineup board</h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)]">
-              Choose any Seat to assign an eligible active Guild Character.
-              Drag-and-drop arrives in the next checkpoint.
+              Drag an assigned Character onto another Seat to move or swap.
+              Picker, Change, and Clear remain available for touch and keyboard.
             </p>
           </div>
 
@@ -517,6 +792,14 @@ export function EventBuilderBoard({
                     onChooseSlot={openCharacterPicker}
                     onClearSlot={clearSlot}
                     busySlotId={busySlotId}
+                    draggingSlotId={draggingSlotId}
+                    draggingCharacterId={draggingCharacterId}
+                    dropTargetSlotId={dropTargetSlotId}
+                    recentlyChangedSlotIds={recentlyChangedSlotSet}
+                    onDragStart={startSlotDrag}
+                    onDragEnd={endSlotDrag}
+                    onDragEnter={setDropTargetSlotId}
+                    onDrop={dropSlot}
                   />
                 ))}
               </div>
@@ -536,6 +819,14 @@ export function EventBuilderBoard({
                   onChooseSlot={openCharacterPicker}
                   onClearSlot={clearSlot}
                   busySlotId={busySlotId}
+                  draggingSlotId={draggingSlotId}
+                  draggingCharacterId={draggingCharacterId}
+                  dropTargetSlotId={dropTargetSlotId}
+                  recentlyChangedSlotIds={recentlyChangedSlotSet}
+                  onDragStart={startSlotDrag}
+                  onDragEnd={endSlotDrag}
+                  onDragEnter={setDropTargetSlotId}
+                  onDrop={dropSlot}
                 />
               ))}
             </div>
@@ -690,5 +981,21 @@ export function EventBuilderBoard({
         ) : null}
       </dialog>
     </div>
+  );
+}
+
+export function EventBuilderBoard(props: EventBuilderBoardProps) {
+  const assignmentVersion = props.event.characters
+    .map(
+      (character) =>
+        `${character.id}:${character.assignedSlotIds.join(",")}`,
+    )
+    .join("|");
+
+  return (
+    <EventBuilderBoardContent
+      key={`${props.event.updatedAt}:${assignmentVersion}`}
+      {...props}
+    />
   );
 }

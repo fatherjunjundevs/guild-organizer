@@ -30,6 +30,10 @@ function mapAssignmentRpcError(code: string | undefined) {
     return "The selected Slot or Character is no longer available.";
   }
 
+  if (code === "22023") {
+    return "Choose two different Event Slots for drag-and-drop.";
+  }
+
   return "The assignment could not be saved.";
 }
 
@@ -67,7 +71,55 @@ export async function assignEventSlotAction(
   revalidatePath(eventPath(guildId, eventId));
   revalidatePath(`/app/guild/${guildId}/events`);
 
-  return { ok: true, message: "Character assignment saved." };
+  return { ok: true, message: "Character assigned." };
+}
+
+export async function moveEventSlotAssignmentAction(
+  formData: FormData,
+): Promise<EventAssignmentMutationResult> {
+  const guildId = getString(formData, "guildId");
+  const eventId = getString(formData, "eventId");
+  const sourceSlotId = getString(formData, "sourceSlotId");
+  const targetSlotId = getString(formData, "targetSlotId");
+
+  if (
+    !isValidEventUuid(guildId) ||
+    !isValidEventUuid(eventId) ||
+    !isValidEventUuid(sourceSlotId) ||
+    !isValidEventUuid(targetSlotId)
+  ) {
+    return { ok: false, message: "The drag-and-drop identifiers are invalid." };
+  }
+
+  const supabase = await createClient();
+  const { data: mode, error } = await supabase.rpc(
+    "move_event_slot_assignment",
+    {
+      p_source_slot_id: sourceSlotId,
+      p_target_slot_id: targetSlotId,
+    },
+  );
+
+  if (error) {
+    return { ok: false, message: mapAssignmentRpcError(error.code) };
+  }
+
+  // Drag/drop uses an optimistic local assignment update. Avoid route
+  // revalidation here so the Event Builder does not remount immediately and
+  // erase the fixed toast before its display duration completes.
+
+  if (mode === "swapped") {
+    return { ok: true, message: "Characters swapped." };
+  }
+
+  if (mode === "same_character") {
+    return {
+      ok: true,
+      message: "That Character is already there.",
+    };
+  }
+
+  return { ok: true, message: "Character moved." };
 }
 
 export async function clearEventSlotAction(
@@ -97,5 +149,5 @@ export async function clearEventSlotAction(
   revalidatePath(eventPath(guildId, eventId));
   revalidatePath(`/app/guild/${guildId}/events`);
 
-  return { ok: true, message: "Slot assignment cleared." };
+  return { ok: true, message: "Character removed." };
 }
