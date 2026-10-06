@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -287,6 +288,15 @@ export function EventManagementView({
                     <p className="text-xs text-[var(--text-tertiary)]">Seats</p>
                     <p className="mt-1 font-semibold">{event.slotCount}</p>
                   </div>
+                </div>
+
+                <div className="mt-4 flex justify-end">
+                  <Link
+                    href={`/app/guild/${guildId}/events/${event.id}`}
+                    className="inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] bg-[var(--accent)] px-4 text-sm font-semibold text-[#07101f] transition-[background-color,transform] duration-[var(--duration-fast)] hover:bg-[var(--accent-hover)] active:translate-y-px"
+                  >
+                    Open Event Builder
+                  </Link>
                 </div>
               </Surface>
             ))}
