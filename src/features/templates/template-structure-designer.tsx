@@ -175,6 +175,40 @@ function MutationMessage({
   );
 }
 
+function ReorderToast({
+  toast,
+}: {
+  toast: { message: string; isError: boolean } | null;
+}) {
+  if (!toast) return null;
+
+  return (
+    <div className="pointer-events-none fixed right-4 bottom-4 z-50 w-[min(22rem,calc(100vw-2rem))] sm:right-6 sm:bottom-6">
+      <div
+        role={toast.isError ? "alert" : "status"}
+        aria-live={toast.isError ? "assertive" : "polite"}
+        className={`rounded-[var(--radius-lg)] border px-4 py-3 shadow-xl backdrop-blur-xl ${
+          toast.isError
+            ? "border-[color-mix(in_srgb,var(--danger)_40%,transparent)] bg-[color-mix(in_srgb,var(--surface-2)_94%,var(--danger)_6%)]"
+            : "border-[color-mix(in_srgb,var(--success)_40%,transparent)] bg-[color-mix(in_srgb,var(--surface-2)_94%,var(--success)_6%)]"
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${
+              toast.isError
+                ? "bg-[var(--danger)]"
+                : "bg-[var(--success)]"
+            }`}
+          />
+          <p className="min-w-0 text-sm font-semibold">{toast.message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TemplateStructureDesigner({
   guildId,
   guildName,
@@ -206,6 +240,10 @@ export function TemplateStructureDesigner({
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
+  const [reorderToast, setReorderToast] = useState<{
+    message: string;
+    isError: boolean;
+  } | null>(null);
   const [inspection, setInspection] = useState<EventTemplateInspection | null>(null);
   const [readinessBusy, setReadinessBusy] = useState<"" | "inspect" | "activate">("");
   const [readinessMessage, setReadinessMessage] = useState("");
@@ -244,6 +282,17 @@ export function TemplateStructureDesigner({
 
     return () => window.cancelAnimationFrame(frame);
   }, [template.tree]);
+
+  useEffect(() => {
+    if (!reorderToast) return;
+
+    const timeoutId = window.setTimeout(
+      () => setReorderToast(null),
+      reorderToast.isError ? 5000 : 3200,
+    );
+
+    return () => window.clearTimeout(timeoutId);
+  }, [reorderToast]);
 
   useLayoutEffect(() => {
     const snapshot = structureScrollRestoreRef.current;
@@ -451,7 +500,7 @@ export function TemplateStructureDesigner({
           { boxShadow: "0 0 0 0 transparent" },
         ],
         {
-          duration: 120,
+          duration: 850,
           easing: "cubic-bezier(0.2, 0.8, 0.2, 1)",
         },
       );
@@ -482,6 +531,7 @@ export function TemplateStructureDesigner({
   function clearMessage() {
     setMessage("");
     setIsError(false);
+    setReorderToast(null);
   }
 
   function applyResult(result: TemplateStructureMutationResult) {
@@ -863,9 +913,17 @@ export function TemplateStructureDesigner({
     setDragItem(null);
 
     if (!result.ok) {
-      applyResult(result);
+      setReorderToast({
+        message: result.message,
+        isError: true,
+      });
       return false;
     }
+
+    setReorderToast({
+      message: "Team moved.",
+      isError: false,
+    });
 
     if (refreshAfterSave) {
       router.refresh();
@@ -906,9 +964,17 @@ export function TemplateStructureDesigner({
     setDragItem(null);
 
     if (!result.ok) {
-      applyResult(result);
+      setReorderToast({
+        message: result.message,
+        isError: true,
+      });
       return false;
     }
+
+    setReorderToast({
+      message: "Party moved.",
+      isError: false,
+    });
 
     if (refreshAfterSave) {
       router.refresh();
@@ -1137,26 +1203,19 @@ export function TemplateStructureDesigner({
         data-party-drag-card
         data-party-id={party.id}
         data-party-parent-id={team.id}
-        style={
-          dragOverItem?.kind === "party" && dragOverItem.id === party.id
-            ? {
-                transform: `translate3d(${dragSwapOffset.x}px, ${dragSwapOffset.y}px, 0)`,
-                zIndex: 30,
-              }
-            : undefined
-        }
-        className={`relative w-44 shrink-0 rounded-[var(--radius-lg)] border bg-[var(--surface-2)] p-3 transition-[border-color,box-shadow,transform] duration-150 ${
+        className={`relative w-44 shrink-0 rounded-[var(--radius-lg)] border bg-[var(--surface-2)] p-3 transition-[border-color,background-color,box-shadow,opacity] duration-300 ${
           dragItem?.kind === "party" && dragItem.id === party.id
-            ? "border-dashed border-[var(--guild-accent)]"
+            ? "border-[var(--border-default)] opacity-45"
             : dragOverItem?.kind === "party" && dragOverItem.id === party.id
-              ? "border-[var(--guild-accent)] ring-1 ring-[var(--guild-accent)] shadow-lg"
+              ? "border-[var(--guild-accent)] bg-[color-mix(in_srgb,var(--surface-2)_92%,var(--guild-accent)_8%)] ring-1 ring-[var(--guild-accent)] shadow-lg"
               : "border-[var(--border-default)]"
         }`}
       >
-        {dragItem?.kind === "party" && dragItem.id === party.id ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--guild-accent)] bg-[var(--surface-2)]">
-            <span className="text-[11px] font-semibold text-[var(--text-tertiary)]">
-              Drop here
+        {dragOverItem?.kind === "party" &&
+        dragOverItem.id === party.id ? (
+          <div className="pointer-events-none absolute inset-x-2 top-2 z-20 flex justify-end">
+            <span className="rounded-full border border-[var(--guild-accent)] bg-[var(--surface-1)] px-2 py-1 text-[10px] font-semibold text-[var(--guild-accent)] shadow-sm">
+              Drop to move
             </span>
           </div>
         ) : null}
@@ -1188,8 +1247,8 @@ export function TemplateStructureDesigner({
               </Button>
               <button
                 type="button"
-                aria-label={`Drag ${party.name} to reorder`}
-                title="Drag to reorder"
+                aria-label={`Drag ${party.name} to move`}
+                title="Drag Party to move"
                 disabled={busyKey !== ""}
                 onPointerDown={(event) =>
                   beginPointerDrag(
@@ -1213,9 +1272,9 @@ export function TemplateStructureDesigner({
                   finishPartyPointerDrag(event, team, party)
                 }
                 onPointerCancel={cancelPointerDrag}
-                className="hidden h-8 flex-1 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-2 text-xs font-semibold text-[var(--text-secondary)] touch-none select-none active:cursor-grabbing md:inline-flex"
+                className="hidden h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-sm font-semibold leading-none text-[var(--text-secondary)] touch-none select-none hover:border-[var(--border-default)] hover:text-[var(--text-primary)] active:cursor-grabbing md:inline-flex"
               >
-                Drag
+                ⋮⋮
               </button>
               <Button
                 type="button"
@@ -1277,36 +1336,25 @@ export function TemplateStructureDesigner({
         data-team-drag-card
         data-team-id={team.id}
         data-team-parent-id={team.areaId ?? ""}
-        style={
-          dragOverItem?.kind === "team" && dragOverItem.id === team.id
-            ? {
-                transform: `translate3d(${dragSwapOffset.x}px, ${dragSwapOffset.y}px, 0)`,
-                zIndex: 30,
-              }
-            : undefined
-        }
-        className={`relative min-w-0 w-full max-w-full rounded-[var(--radius-xl)] transition-[box-shadow,outline-color,transform] duration-150 ${
+        className={`relative min-w-0 w-full max-w-full rounded-[var(--radius-xl)] transition-[box-shadow,opacity] duration-300 ${
           dragItem?.kind === "team" && dragItem.id === team.id
-            ? "outline outline-1 outline-dashed outline-[var(--guild-accent)]"
+            ? "opacity-45"
             : dragOverItem?.kind === "team" && dragOverItem.id === team.id
               ? "ring-1 ring-[var(--guild-accent)] shadow-xl"
               : ""
         }`}
       >
-        {dragItem?.kind === "team" && dragItem.id === team.id ? (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center rounded-[var(--radius-xl)] border border-dashed border-[var(--guild-accent)] bg-[var(--surface-2)]">
-            <span className="text-xs font-semibold text-[var(--text-tertiary)]">
-              Drop Team here
+        {dragOverItem?.kind === "team" &&
+        dragOverItem.id === team.id ? (
+          <div className="pointer-events-none absolute top-3 right-3 z-30">
+            <span className="rounded-full border border-[var(--guild-accent)] bg-[var(--surface-1)] px-2.5 py-1 text-[11px] font-semibold text-[var(--guild-accent)] shadow-sm">
+              Drop to move
             </span>
           </div>
         ) : null}
         <Surface
           level={2}
-          className={`min-w-0 max-w-full overflow-hidden p-4 transition-all duration-150 sm:p-5 ${
-            dragItem?.kind === "team" && dragItem.id === team.id
-              ? "pointer-events-none opacity-0"
-              : ""
-          }`}
+          className="min-w-0 max-w-full overflow-hidden p-4 transition-all duration-150 sm:p-5"
         >
         <div className="min-w-0 flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -1337,8 +1385,8 @@ export function TemplateStructureDesigner({
               </Button>
               <button
                 type="button"
-                aria-label={`Drag ${team.name} to reorder`}
-                title="Drag Team to reorder"
+                aria-label={`Drag ${team.name} to move`}
+                title="Drag Team to move"
                 disabled={busyKey !== ""}
                 onPointerDown={(event) =>
                   beginPointerDrag(
@@ -1360,9 +1408,9 @@ export function TemplateStructureDesigner({
                 }
                 onPointerUp={(event) => finishTeamPointerDrag(event, team)}
                 onPointerCancel={cancelPointerDrag}
-                className="hidden h-8 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-secondary)] touch-none select-none active:cursor-grabbing md:inline-flex"
+                className="hidden h-8 w-8 shrink-0 cursor-grab items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] text-sm font-semibold leading-none text-[var(--text-secondary)] touch-none select-none hover:border-[var(--border-default)] hover:text-[var(--text-primary)] active:cursor-grabbing md:inline-flex"
               >
-                Drag Team
+                ⋮⋮
               </button>
               <Button
                 type="button"
@@ -1745,6 +1793,7 @@ export function TemplateStructureDesigner({
           ) : null}
         </Surface>
 
+        <ReorderToast toast={reorderToast} />
         <MutationMessage message={message} isError={isError} />
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
