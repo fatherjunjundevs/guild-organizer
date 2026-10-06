@@ -1,24 +1,12 @@
 import "server-only";
 
 import type { GuildAccess } from "@/features/guilds/server";
-import {
-  buildEventBuilderStructure,
-  type EventBuilderStructure,
-} from "@/features/events/event-builder";
+import { buildEventBuilderStructure } from "@/features/events/event-builder";
+import type {
+  EventBuilderCharacter,
+  EventBuilderEvent,
+} from "@/features/events/event-assignment";
 import { createClient } from "@/lib/supabase/server";
-
-export type EventBuilderEvent = {
-  id: string;
-  name: string;
-  description: string | null;
-  status: "active" | "archived";
-  eventTypeName: string;
-  templateName: string;
-  usesAreas: boolean;
-  createdAt: string;
-  updatedAt: string;
-  structure: EventBuilderStructure;
-};
 
 export type EventBuilderLoadResult =
   | { status: "ready"; event: EventBuilderEvent }
@@ -76,43 +64,52 @@ export async function loadEventBuilder(
     return { status: "not-found", event: null };
   }
 
-  const [areasResult, sectionsResult, partiesResult, slotsResult] =
-    await Promise.all([
-      supabase
-        .from("event_areas")
-        .select("id,name,sort_order")
-        .eq("guild_id", access.guildId)
-        .eq("event_id", eventId)
-        .order("sort_order", { ascending: true })
-        .order("id", { ascending: true }),
-      supabase
-        .from("event_sections")
-        .select("id,area_id,name,sort_order")
-        .eq("guild_id", access.guildId)
-        .eq("event_id", eventId)
-        .order("sort_order", { ascending: true })
-        .order("id", { ascending: true }),
-      supabase
-        .from("event_parties")
-        .select("id,section_id,name,sort_order")
-        .eq("guild_id", access.guildId)
-        .eq("event_id", eventId)
-        .order("sort_order", { ascending: true })
-        .order("id", { ascending: true }),
-      supabase
-        .from("event_slots")
-        .select("id,party_id,name,role_label,sort_order")
-        .eq("guild_id", access.guildId)
-        .eq("event_id", eventId)
-        .order("sort_order", { ascending: true })
-        .order("id", { ascending: true }),
-    ]);
+  const [
+    areasResult,
+    sectionsResult,
+    partiesResult,
+    slotsResult,
+    charactersResult,
+  ] = await Promise.all([
+    supabase
+      .from("event_areas")
+      .select("id,name,sort_order")
+      .eq("guild_id", access.guildId)
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true }),
+    supabase
+      .from("event_sections")
+      .select("id,area_id,name,sort_order")
+      .eq("guild_id", access.guildId)
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true }),
+    supabase
+      .from("event_parties")
+      .select("id,section_id,name,sort_order")
+      .eq("guild_id", access.guildId)
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true }),
+    supabase
+      .from("event_slots")
+      .select("id,party_id,name,role_label,sort_order")
+      .eq("guild_id", access.guildId)
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true })
+      .order("id", { ascending: true }),
+    supabase.rpc("get_event_builder_characters", {
+      p_event_id: eventId,
+    }),
+  ]);
 
   if (
     areasResult.error ||
     sectionsResult.error ||
     partiesResult.error ||
-    slotsResult.error
+    slotsResult.error ||
+    charactersResult.error
   ) {
     return { status: "error", event: null };
   }
@@ -125,6 +122,22 @@ export async function loadEventBuilder(
     parties: partiesResult.data ?? [],
     slots: slotsResult.data ?? [],
   });
+
+  const characters: EventBuilderCharacter[] = (
+    charactersResult.data ?? []
+  ).map((character) => ({
+    id: character.character_id,
+    ign: character.ign,
+    level: character.level,
+    className: character.class_name,
+    guildPosition: character.guild_position,
+    gearScore: character.gear_score,
+    onlineStatus: character.online_status,
+    designation: character.designation,
+    roleLabel: character.role_label,
+    status: character.character_status as "active" | "inactive",
+    assignedSlotIds: character.assigned_slot_ids ?? [],
+  }));
 
   return {
     status: "ready",
@@ -139,6 +152,7 @@ export async function loadEventBuilder(
       createdAt: source.created_at,
       updatedAt: source.updated_at,
       structure,
+      characters,
     },
   };
 }

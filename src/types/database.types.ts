@@ -925,8 +925,14 @@ isOneToOne: false
               "created_count": number,"left_guild_count": number,"reactivated_count": number,"source_row_count": number,"sync_run_id": string,"unchanged_count": number,"updated_count": number
             }[]
                            },
+"assign_event_slot":
+{ Args: { "p_character_id": string,"p_slot_id": string }; Returns: string
+                           },
 "bulk_update_roster_characters":
 { Args: { "p_action": string,"p_character_ids": (string)[],"p_value": string }; Returns: number
+                           },
+"clear_event_slot":
+{ Args: { "p_slot_id": string }; Returns: undefined
                            },
 "clone_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_name": string,"p_source_template_id": string }; Returns: string
@@ -996,6 +1002,11 @@ isOneToOne: false
                            },
 "delete_roster_tag":
 { Args: { "p_tag_id": string }; Returns: undefined
+                           },
+"get_event_builder_characters":
+{ Args: { "p_event_id": string }; Returns: {
+              "assigned_slot_ids": (string)[],"character_id": string,"character_status": string,"class_name": string,"designation": string,"gear_score": number,"guild_position": string,"ign": string,"level": number,"online_status": string,"role_label": string
+            }[]
                            },
 "get_event_template_preview":
 { Args: { "p_template_id": string }; Returns: {
