@@ -27,12 +27,15 @@ Authorization is enforced at the server/database layer. UI visibility is conveni
 - Cross-Guild access must be rejected.
 - Protected writes use authorized RPC/server boundaries.
 
-Existing capabilities include:
+Relevant Guild-management capabilities include:
 
 - `roster.manage`
 - `imports.manage`
+- `templates.manage`
+- `events.manage`
+- `publish.manage`
 
-Future Event/template/publish permissions should follow the same capability pattern where useful.
+`templates.manage` and `events.manage` are active authorization boundaries for the Template Designer and Event Builder. `publish.manage` is already defined in the capability model for the Phase 6 publishing workflow.
 
 ## Database Security
 
@@ -78,7 +81,9 @@ Event Type
   -> Published Version
 ```
 
-Template edits after Event creation must not silently restructure historical Events. Published versions are immutable snapshots.
+Template edits after Event creation must not silently restructure historical Events. Phase 5 implements the Event-owned structural snapshot and draft assignment layers; assignments reference stable Character UUIDs. Draft duplicate assignments are allowed and surfaced as advisory warnings so organizers can resolve them deliberately.
+
+Published versions are immutable snapshots and remain Phase 6 scope.
 
 ## UI Architecture
 

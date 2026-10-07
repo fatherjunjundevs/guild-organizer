@@ -77,8 +77,37 @@ Phase 4 is quality-gated complete.
 
 See [`PHASE_4_QUALITY_GATE.md`](PHASE_4_QUALITY_GATE.md) for evidence and scope boundaries.
 
-## Phase 5 — Guild League Builder / Core v1 ⏳
-Event creation from template, Event-owned structural snapshot, assignment workflow, drag/drop, warning system, duplicate detection, missing-role detection, unassigned/eligible views, responsive parity, and fast assignment search.
+## Phase 5 — Guild League Builder / Core v1 ✅
+
+Completed internal checkpoints:
+
+- **5.1A** Event-owned data foundation ✅
+- **5.1B** Atomic Event creation from active Template ✅
+- **5.2A** Event management/list/create UI ✅
+- **5.2B** Event Builder read model + structural board ✅
+- **5.3A** Assignment RPCs, eligibility, unassigned view, and fast search ✅
+- **5.3B** Drag/drop move + swap assignment workflow ✅
+- **5.4A** Advisory warning engine ✅
+- **5.4B** Responsive parity + critical Event Builder E2E ✅
+- **5.5** Phase 5 integration, quality gate, and documentation ✅
+
+Completed Phase 5 scope:
+
+- Event creation from active Templates with Event-owned structural snapshots ✅
+- Guild-scoped Event list/create/manage workflow ✅
+- Eligible and unassigned Character views with fast assignment search ✅
+- Picker assignment/change/clear workflow ✅
+- Desktop pointer drag/drop with open-seat move and occupied-seat swap ✅
+- Advisory duplicate, required-role, missing-role, role-conflict, and inactive-assignment warnings ✅
+- Party Full/open-seat status and live warning recalculation ✅
+- Responsive desktop/tablet/mobile parity with critical authenticated Event Builder E2E coverage ✅
+- Full local Phase 5 quality gate: TypeScript, lint, unit, build, E2E, clean DB reset, DB lint/tests/types/advisors, and diff checks ✅
+
+Phase 5 is quality-gated complete locally.
+
+Publishing, immutable published versions, member-facing lineup/search, and sharing remain Phase 6 scope.
+
+See [`PHASE_5_QUALITY_GATE.md`](PHASE_5_QUALITY_GATE.md) for evidence and scope boundaries.
 
 ## Phase 6 — Publishing & Sharing ⏳
 Preview, immutable published versions, publication history, share links, Discord-ready sharing, member-facing lineup, IGN search, and clear version/update behavior.
