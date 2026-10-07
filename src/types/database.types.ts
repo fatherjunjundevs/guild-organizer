@@ -320,6 +320,193 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"event_publication_areas": {
+                  Row: {
+                    "created_at": string,"event_id": string,"guild_id": string,"id": string,"name": string,"publication_version_id": string,"sort_order": number,"source_event_area_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"event_id": string,"guild_id": string,"id"?: string,"name": string,"publication_version_id": string,"sort_order"?: number,"source_event_area_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_id"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"publication_version_id"?: string,"sort_order"?: number,"source_event_area_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_areas_version_fk"
+      columns: ["guild_id","event_id","publication_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publication_assignments": {
+                  Row: {
+                    "character_class_snapshot": string | null,"character_designation_snapshot": string | null,"character_ign_snapshot": string,"character_role_snapshot": string | null,"character_status_snapshot": string,"created_at": string,"event_id": string,"guild_id": string,"id": string,"publication_version_id": string,"slot_id": string,"source_character_id": string,"source_event_assignment_id": string
+                  }
+                  Insert: {
+                    "character_class_snapshot"?: string | null,"character_designation_snapshot"?: string | null,"character_ign_snapshot": string,"character_role_snapshot"?: string | null,"character_status_snapshot": string,"created_at"?: string,"event_id": string,"guild_id": string,"id"?: string,"publication_version_id": string,"slot_id": string,"source_character_id": string,"source_event_assignment_id": string
+                  }
+                  Update: {
+                    "character_class_snapshot"?: string | null,"character_designation_snapshot"?: string | null,"character_ign_snapshot"?: string,"character_role_snapshot"?: string | null,"character_status_snapshot"?: string,"created_at"?: string,"event_id"?: string,"guild_id"?: string,"id"?: string,"publication_version_id"?: string,"slot_id"?: string,"source_character_id"?: string,"source_event_assignment_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_assignments_slot_fk"
+      columns: ["guild_id","event_id","publication_version_id","slot_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_slots"
+      referencedColumns: ["guild_id","event_id","publication_version_id","id"]
+    },{
+      foreignKeyName: "event_publication_assignments_version_fk"
+      columns: ["guild_id","event_id","publication_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publication_parties": {
+                  Row: {
+                    "created_at": string,"event_id": string,"guild_id": string,"id": string,"name": string,"publication_version_id": string,"section_id": string,"sort_order": number,"source_event_party_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"event_id": string,"guild_id": string,"id"?: string,"name": string,"publication_version_id": string,"section_id": string,"sort_order"?: number,"source_event_party_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_id"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"publication_version_id"?: string,"section_id"?: string,"sort_order"?: number,"source_event_party_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_parties_section_fk"
+      columns: ["guild_id","event_id","publication_version_id","section_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_sections"
+      referencedColumns: ["guild_id","event_id","publication_version_id","id"]
+    },{
+      foreignKeyName: "event_publication_parties_version_fk"
+      columns: ["guild_id","event_id","publication_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publication_sections": {
+                  Row: {
+                    "area_id": string | null,"created_at": string,"event_id": string,"guild_id": string,"id": string,"name": string,"publication_version_id": string,"sort_order": number,"source_event_section_id": string
+                  }
+                  Insert: {
+                    "area_id"?: string | null,"created_at"?: string,"event_id": string,"guild_id": string,"id"?: string,"name": string,"publication_version_id": string,"sort_order"?: number,"source_event_section_id": string
+                  }
+                  Update: {
+                    "area_id"?: string | null,"created_at"?: string,"event_id"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"publication_version_id"?: string,"sort_order"?: number,"source_event_section_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_sections_area_fk"
+      columns: ["guild_id","event_id","publication_version_id","area_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_areas"
+      referencedColumns: ["guild_id","event_id","publication_version_id","id"]
+    },{
+      foreignKeyName: "event_publication_sections_version_fk"
+      columns: ["guild_id","event_id","publication_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publication_slots": {
+                  Row: {
+                    "created_at": string,"event_id": string,"guild_id": string,"id": string,"name": string,"party_id": string,"publication_version_id": string,"role_label": string | null,"sort_order": number,"source_event_slot_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"event_id": string,"guild_id": string,"id"?: string,"name": string,"party_id": string,"publication_version_id": string,"role_label"?: string | null,"sort_order"?: number,"source_event_slot_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"event_id"?: string,"guild_id"?: string,"id"?: string,"name"?: string,"party_id"?: string,"publication_version_id"?: string,"role_label"?: string | null,"sort_order"?: number,"source_event_slot_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_slots_party_fk"
+      columns: ["guild_id","event_id","publication_version_id","party_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_parties"
+      referencedColumns: ["guild_id","event_id","publication_version_id","id"]
+    },{
+      foreignKeyName: "event_publication_slots_version_fk"
+      columns: ["guild_id","event_id","publication_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publication_versions": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"event_description_snapshot": string | null,"event_id": string,"event_name_snapshot": string,"event_type_name_snapshot": string,"guild_id": string,"id": string,"publication_id": string,"sealed_at": string | null,"source_event_type_id": string,"source_template_id": string,"template_name_snapshot": string,"uses_areas": boolean,"version_number": number
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"event_description_snapshot"?: string | null,"event_id": string,"event_name_snapshot": string,"event_type_name_snapshot": string,"guild_id": string,"id"?: string,"publication_id": string,"sealed_at"?: string | null,"source_event_type_id": string,"source_template_id": string,"template_name_snapshot": string,"uses_areas": boolean,"version_number": number
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"event_description_snapshot"?: string | null,"event_id"?: string,"event_name_snapshot"?: string,"event_type_name_snapshot"?: string,"guild_id"?: string,"id"?: string,"publication_id"?: string,"sealed_at"?: string | null,"source_event_type_id"?: string,"source_template_id"?: string,"template_name_snapshot"?: string,"uses_areas"?: boolean,"version_number"?: number
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publication_versions_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_publication_versions_publication_fk"
+      columns: ["guild_id","event_id","publication_id"]
+isOneToOne: false
+      referencedRelation: "event_publications"
+      referencedColumns: ["guild_id","event_id","id"]
+    }
+                  ]
+                },"event_publications": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"current_version_id": string | null,"event_id": string,"guild_id": string,"id": string,"published_at": string | null,"status": string,"unpublished_at": string | null,"updated_at": string,"updated_by": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"current_version_id"?: string | null,"event_id": string,"guild_id": string,"id"?: string,"published_at"?: string | null,"status"?: string,"unpublished_at"?: string | null,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"current_version_id"?: string | null,"event_id"?: string,"guild_id"?: string,"id"?: string,"published_at"?: string | null,"status"?: string,"unpublished_at"?: string | null,"updated_at"?: string,"updated_by"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "event_publications_created_by_fkey"
+      columns: ["created_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_publications_current_version_fk"
+      columns: ["guild_id","event_id","id","current_version_id"]
+isOneToOne: false
+      referencedRelation: "event_publication_versions"
+      referencedColumns: ["guild_id","event_id","publication_id","id"]
+    },{
+      foreignKeyName: "event_publications_event_fk"
+      columns: ["guild_id","event_id"]
+isOneToOne: true
+      referencedRelation: "events"
+      referencedColumns: ["guild_id","id"]
+    },{
+      foreignKeyName: "event_publications_guild_id_fkey"
+      columns: ["guild_id"]
+isOneToOne: false
+      referencedRelation: "guilds"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "event_publications_updated_by_fkey"
+      columns: ["updated_by"]
+isOneToOne: false
+      referencedRelation: "profiles"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"event_sections": {
                   Row: {
                     "area_id": string | null,"created_at": string,"created_by": string | null,"event_id": string,"guild_id": string,"id": string,"name": string,"sort_order": number,"updated_at": string,"updated_by": string | null
