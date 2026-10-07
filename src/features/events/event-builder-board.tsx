@@ -233,6 +233,7 @@ function SeatCard({
 
   return (
     <div
+      data-event-slot-id={slot.id}
       onDragEnter={() => {
         if (draggingSlotId && draggingSlotId !== slot.id) {
           onDragEnter(slot.id);
@@ -297,6 +298,7 @@ function SeatCard({
 
       {assignment ? (
         <div
+          data-assigned-character-id={assignment.id}
           draggable={!eventArchived && !busy}
           onDragStart={(event) =>
             onDragStart(event, slot.id, assignment.id)

@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { isValidEventUuid } from "@/features/events/event-management";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,9 +63,10 @@ export async function assignEventSlotAction(
     return { ok: false, message: mapAssignmentRpcError(error.code) };
   }
 
-  // The Event Builder updates assignments optimistically. Revalidating the
-  // current route here would remount it and erase immediate warning/toast state.
-  revalidatePath(`/app/guild/${guildId}/events`);
+  // Keep the mounted board in control of its assignment state. In a Server
+  // Action, revalidatePath also sends a fresh payload for the current route,
+  // even when its argument names the Events list. That payload can remount
+  // the board after the next optimistic move has already started.
 
   return { ok: true, message: "Character assigned." };
 }
@@ -143,9 +143,10 @@ export async function clearEventSlotAction(
     return { ok: false, message: mapAssignmentRpcError(error.code) };
   }
 
-  // The Event Builder updates assignments optimistically. Revalidating the
-  // current route here would remount it and erase immediate warning/toast state.
-  revalidatePath(`/app/guild/${guildId}/events`);
+  // Keep the mounted board in control of its assignment state. In a Server
+  // Action, revalidatePath also sends a fresh payload for the current route,
+  // even when its argument names the Events list. That payload can remount
+  // the board after the next optimistic move has already started.
 
   return { ok: true, message: "Character removed." };
 }
