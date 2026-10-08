@@ -6,11 +6,26 @@ import type {
   EventBuilderCharacter,
   EventBuilderEvent,
 } from "@/features/events/event-assignment";
+import type { EventPublicationState } from "@/features/events/event-publication";
+import {
+  canPublishEvent,
+  loadEventPublicationState,
+} from "@/features/events/publication-server";
 import { createClient } from "@/lib/supabase/server";
 
 export type EventBuilderLoadResult =
-  | { status: "ready"; event: EventBuilderEvent }
-  | { status: "forbidden" | "not-found" | "error"; event: null };
+  | {
+      status: "ready";
+      event: EventBuilderEvent;
+      publication: EventPublicationState;
+      canPublish: boolean;
+    }
+  | {
+      status: "forbidden" | "not-found" | "error";
+      event: null;
+      publication: null;
+      canPublish: false;
+    };
 
 async function canManageEventBuilder(
   access: GuildAccess,
@@ -43,7 +58,12 @@ export async function loadEventBuilder(
   const authorization = await canManageEventBuilder(access);
 
   if (authorization !== "allowed") {
-    return { status: authorization, event: null };
+    return {
+      status: authorization,
+      event: null,
+      publication: null,
+      canPublish: false,
+    };
   }
 
   const supabase = await createClient();
@@ -57,11 +77,21 @@ export async function loadEventBuilder(
     .maybeSingle();
 
   if (eventResult.error) {
-    return { status: "error", event: null };
+    return {
+      status: "error",
+      event: null,
+      publication: null,
+      canPublish: false,
+    };
   }
 
   if (!eventResult.data) {
-    return { status: "not-found", event: null };
+    return {
+      status: "not-found",
+      event: null,
+      publication: null,
+      canPublish: false,
+    };
   }
 
   const [
@@ -70,6 +100,8 @@ export async function loadEventBuilder(
     partiesResult,
     slotsResult,
     charactersResult,
+    publicationResult,
+    publishAuthorization,
   ] = await Promise.all([
     supabase
       .from("event_areas")
@@ -102,6 +134,8 @@ export async function loadEventBuilder(
     supabase.rpc("get_event_builder_characters", {
       p_event_id: eventId,
     }),
+    loadEventPublicationState(access.guildId, eventId),
+    canPublishEvent(access),
   ]);
 
   if (
@@ -109,9 +143,16 @@ export async function loadEventBuilder(
     sectionsResult.error ||
     partiesResult.error ||
     slotsResult.error ||
-    charactersResult.error
+    charactersResult.error ||
+    publicationResult.status === "error" ||
+    publishAuthorization === "error"
   ) {
-    return { status: "error", event: null };
+    return {
+      status: "error",
+      event: null,
+      publication: null,
+      canPublish: false,
+    };
   }
 
   const source = eventResult.data;
@@ -141,6 +182,8 @@ export async function loadEventBuilder(
 
   return {
     status: "ready",
+    publication: publicationResult.publication,
+    canPublish: publishAuthorization === "allowed",
     event: {
       id: source.id,
       name: source.name,

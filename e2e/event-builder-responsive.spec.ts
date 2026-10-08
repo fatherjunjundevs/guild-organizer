@@ -36,8 +36,8 @@ test("Event Builder remains usable at a mobile viewport", async ({
         name: "Assignment warnings",
       }),
     ).toBeVisible();
-    await expect(page.getByText("Party 1", { exact: true })).toBeVisible();
-    await expect(page.getByText("Party 2", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 4, name: "Party 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 4, name: "Party 2" })).toBeVisible();
     await expectNoDocumentOverflow(page);
 
     const healerSeat = page.locator(
@@ -100,8 +100,8 @@ test("Event Builder keeps board and checks readable at a tablet viewport", async
     await expect(
       page.getByText("2 warnings", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByText("Party 1", { exact: true })).toBeVisible();
-    await expect(page.getByText("Party 2", { exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 4, name: "Party 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 4, name: "Party 2" })).toBeVisible();
     await expect(
       page.getByText("3 Eligible Characters", { exact: false }),
     ).toHaveCount(0);

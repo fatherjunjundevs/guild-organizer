@@ -107,7 +107,14 @@ test("Event Builder critical assignment workflow keeps warnings live", async ({
       .click();
 
     await expect(
-      page.getByText("No warnings", { exact: true }),
+      page
+        .getByRole("heading", {
+          level: 2,
+          name: "Assignment warnings",
+        })
+        .locator("..")
+        .locator("..")
+        .getByText("No warnings", { exact: true }),
     ).toBeVisible();
     await expect(
       duplicateSeat.getByRole("button", { name: "Assign Character" }),
@@ -155,7 +162,14 @@ test("Event Builder critical assignment workflow keeps warnings live", async ({
       ),
     ).toBeVisible();
     await expect(
-      page.getByText("No warnings", { exact: true }),
+      page
+        .getByRole("heading", {
+          level: 2,
+          name: "Assignment warnings",
+        })
+        .locator("..")
+        .locator("..")
+        .getByText("No warnings", { exact: true }),
     ).toBeVisible();
 
     // Confirm the completed swap is persisted, not just shown optimistically.
@@ -181,7 +195,14 @@ test("Event Builder critical assignment workflow keeps warnings live", async ({
       }),
     ).toBeVisible();
     await expect(
-      page.getByText("No warnings", { exact: true }),
+      page
+        .getByRole("heading", {
+          level: 2,
+          name: "Assignment warnings",
+        })
+        .locator("..")
+        .locator("..")
+        .getByText("No warnings", { exact: true }),
     ).toBeVisible();
   } finally {
     await fixture.cleanup();
