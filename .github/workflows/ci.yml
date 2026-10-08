@@ -105,6 +105,9 @@ jobs:
       - name: Database tests
         run: pnpm db:test
 
+      - name: Share-link concurrency tests in an owned disposable database
+        run: pnpm db:test:concurrency
+
       - name: Verify generated database types
         run: pnpm db:types:check
 

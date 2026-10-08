@@ -17,6 +17,7 @@
     "db:reset": "supabase db reset --local",
     "db:lint": "supabase db lint",
     "db:test": "supabase test db",
+    "db:test:concurrency": "node scripts/test-share-link-concurrency.mjs",
     "db:types": "node scripts/generate-database-types.mjs",
     "db:types:check": "node scripts/generate-database-types.mjs --check"
   },

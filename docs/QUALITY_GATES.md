@@ -76,6 +76,7 @@ As applicable:
 - [ ] `pnpm test:e2e`
 - [ ] `pnpm db:lint`
 - [ ] `pnpm db:test`
+- [ ] `pnpm db:test:concurrency` (owned disposable database; real competing sessions)
 - [ ] `pnpm db:types:check`
 - [ ] `git diff --check`
 - [ ] Browser smoke test

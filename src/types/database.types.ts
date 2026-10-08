@@ -1127,6 +1127,9 @@ isOneToOne: false
 "create_event_from_template":
 { Args: { "p_description"?: string,"p_name": string,"p_template_id": string }; Returns: string
                            },
+"create_event_share_link":
+{ Args: { "p_encryption_key_id": string,"p_event_id": string,"p_guild_id": string,"p_link_id": string,"p_provisioning_expires_at": number,"p_provisioning_key_id": string,"p_provisioning_mac": string,"p_token_auth_tag": string,"p_token_ciphertext": string,"p_token_digest": string,"p_token_nonce": string }; Returns: string
+                           },
 "create_event_template":
 { Args: { "p_description"?: string,"p_event_type_id": string,"p_guild_id": string,"p_name": string,"p_uses_areas"?: boolean }; Returns: string
                            },
@@ -1195,6 +1198,16 @@ isOneToOne: false
               "assigned_slot_ids": (string)[],"character_id": string,"character_status": string,"class_name": string,"designation": string,"gear_score": number,"guild_position": string,"ign": string,"level": number,"online_status": string,"role_label": string
             }[]
                            },
+"get_event_share_link_copy_payload":
+{ Args: { "p_event_id": string,"p_guild_id": string,"p_link_id": string }; Returns: {
+              "encryption_key_id": string,"link_id": string,"token_auth_tag": string,"token_ciphertext": string,"token_digest": string,"token_nonce": string
+            }[]
+                           },
+"get_event_share_link_state":
+{ Args: { "p_event_id": string,"p_guild_id": string }; Returns: {
+              "available": boolean,"created_at": string,"link_id": string
+            }[]
+                           },
 "get_event_template_preview":
 { Args: { "p_template_id": string }; Returns: {
               "area_id": string,"area_name": string,"area_sort_order": number,"event_type_id": string,"event_type_name": string,"party_id": string,"party_name": string,"party_sort_order": number,"role_label": string,"section_id": string,"section_name": string,"section_sort_order": number,"slot_id": string,"slot_name": string,"slot_sort_order": number,"template_description": string,"template_id": string,"template_name": string,"template_status": string,"uses_areas": boolean
@@ -1239,16 +1252,27 @@ isOneToOne: false
 "reorder_event_template_teams":
 { Args: { "p_area_id": string,"p_ordered_section_ids": (string)[],"p_template_id": string }; Returns: undefined
                            },
+"resolve_event_share_link":
+{ Args: { "p_token": string }; Returns: {
+              "event_name": string,"event_type_name": string,"published_at": string,"version_number": number
+            }[]
+                           },
 "resolve_guild_invite":
 { Args: { "p_generation": number,"p_token_digest": string }; Returns: {
               "expires_at": string,"generation": number,"guild_id": string,"guild_name": string,"invite_id": string,"invite_kind": string,"invite_role": string
             }[]
+                           },
+"revoke_event_share_link":
+{ Args: { "p_event_id": string,"p_guild_id": string,"p_link_id": string }; Returns: undefined
                            },
 "revoke_guild_invite":
 { Args: { "p_invite_id": string }; Returns: undefined
                            },
 "revoke_officer_capability":
 { Args: { "p_capability_key": string,"p_membership_id": string }; Returns: undefined
+                           },
+"rotate_event_share_link":
+{ Args: { "p_encryption_key_id": string,"p_event_id": string,"p_expected_link_id": string,"p_guild_id": string,"p_new_link_id": string,"p_provisioning_expires_at": number,"p_provisioning_key_id": string,"p_provisioning_mac": string,"p_token_auth_tag": string,"p_token_ciphertext": string,"p_token_digest": string,"p_token_nonce": string }; Returns: string
                            },
 "set_character_manual_status":
 { Args: { "p_character_id": string,"p_status": string }; Returns: undefined
