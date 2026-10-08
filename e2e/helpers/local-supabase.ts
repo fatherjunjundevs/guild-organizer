@@ -380,6 +380,8 @@ export async function createAuthenticatedRoleFixture(
 }
 
 export type EventBuilderE2EFixture = {
+  userClient: Awaited<ReturnType<typeof createConfirmedSession>>["userClient"];
+  anonymousClient: Awaited<ReturnType<typeof createConfirmedSession>>["userClient"];
   guildId: string;
   eventId: string;
   slotIds: {
@@ -744,6 +746,10 @@ export async function createAuthenticatedEventBuilderFixture(
       eventId,
       slotIds,
       characterIds,
+      userClient: account.userClient,
+      anonymousClient: createClient(env.apiUrl, env.publishableKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      }),
       cleanup: cleanupPartial,
     };
   } catch (error) {

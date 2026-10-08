@@ -1,8 +1,16 @@
 "use server";
 
 import { isValidEventUuid } from "@/features/events/event-management";
-import type { EventPublicationState } from "@/features/events/event-publication";
-import { loadEventPublicationState } from "@/features/events/publication-server";
+import type {
+  EventPublicationState,
+  EventPublicationVersionSnapshot,
+  EventPublicationHistoryPage,
+} from "@/features/events/event-publication";
+import {
+  loadEventPublicationState,
+  loadEventPublicationHistoryPage,
+  loadEventPublicationVersionSnapshot,
+} from "@/features/events/publication-server";
 import { createClient } from "@/lib/supabase/server";
 
 export type EventPublicationMutationResult =
@@ -10,6 +18,17 @@ export type EventPublicationMutationResult =
       ok: true;
       message: string;
       publication: EventPublicationState | null;
+      historyCount: number | null;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
+export type EventPublicationSnapshotResult =
+  | {
+      ok: true;
+      snapshot: EventPublicationVersionSnapshot;
     }
   | {
       ok: false;
@@ -56,8 +75,16 @@ async function loadSavedPublication(
   guildId: string,
   eventId: string,
 ) {
-  const result = await loadEventPublicationState(guildId, eventId);
-  return result.status === "ready" ? result.publication : null;
+  try {
+    const result = await loadEventPublicationState(guildId, eventId);
+    return result.status === "ready"
+      ? { publication: result.publication, historyCount: result.historyCount }
+      : null;
+  } catch {
+    // The mutation has already committed. A read failure must never turn it
+    // into a reported mutation failure or invite an automatic mutation retry.
+    return null;
+  }
 }
 
 async function eventMatchesGuild(
@@ -111,14 +138,15 @@ export async function publishEventAction(
     };
   }
 
-  const publication = await loadSavedPublication(guildId, eventId);
+  const saved = await loadSavedPublication(guildId, eventId);
 
   return {
     ok: true,
-    message: publication?.currentVersionNumber
-      ? `Published version ${publication.currentVersionNumber}.`
+    message: saved?.publication.currentVersionNumber
+      ? `Published version ${saved.publication.currentVersionNumber}.`
       : "The Event was published. Refresh to load its version status.",
-    publication,
+    publication: saved?.publication ?? null,
+    historyCount: saved?.historyCount ?? null,
   };
 }
 
@@ -158,14 +186,15 @@ export async function updateEventPublicationAction(
     };
   }
 
-  const publication = await loadSavedPublication(guildId, eventId);
+  const saved = await loadSavedPublication(guildId, eventId);
 
   return {
     ok: true,
-    message: publication?.currentVersionNumber
-      ? `Published update as version ${publication.currentVersionNumber}.`
+    message: saved?.publication.currentVersionNumber
+      ? `Published update as version ${saved.publication.currentVersionNumber}.`
       : "The publication was updated. Refresh to load its version status.",
-    publication,
+    publication: saved?.publication ?? null,
+    historyCount: saved?.historyCount ?? null,
   };
 }
 
@@ -202,12 +231,94 @@ export async function unpublishEventAction(
     };
   }
 
-  const publication = await loadSavedPublication(guildId, eventId);
+  const saved = await loadSavedPublication(guildId, eventId);
 
   return {
     ok: true,
     message:
       "Event unpublished. Immutable publication history was preserved.",
-    publication,
+    publication: saved?.publication ?? null,
+    historyCount: saved?.historyCount ?? null,
   };
+}
+
+export async function loadEventPublicationVersionAction(
+  formData: FormData,
+): Promise<EventPublicationSnapshotResult> {
+  const guildId = getString(formData, "guildId");
+  const eventId = getString(formData, "eventId");
+  const versionId = getString(formData, "versionId");
+
+  if (
+    !isValidEventUuid(guildId) ||
+    !isValidEventUuid(eventId) ||
+    !isValidEventUuid(versionId)
+  ) {
+    return {
+      ok: false,
+      message: "The publication history identifiers are invalid.",
+    };
+  }
+
+  const context = await eventMatchesGuild(guildId, eventId);
+
+  if (!context.matches) {
+    return {
+      ok: false,
+      message: "This Event is unavailable for the selected Guild.",
+    };
+  }
+
+  const result = await loadEventPublicationVersionSnapshot(
+    guildId,
+    eventId,
+    versionId,
+  );
+
+  if (result.status === "not-found") {
+    return {
+      ok: false,
+      message: "That immutable publication version is no longer available.",
+    };
+  }
+
+  if (result.status === "error" || !result.snapshot) {
+    return {
+      ok: false,
+      message: "The immutable publication snapshot could not be loaded.",
+    };
+  }
+
+  return {
+    ok: true,
+    snapshot: result.snapshot,
+  };
+}
+
+export async function refreshEventPublicationAction(formData: FormData) {
+  const guildId = getString(formData, "guildId");
+  const eventId = getString(formData, "eventId");
+  if (!isValidEventUuid(guildId) || !isValidEventUuid(eventId)) return null;
+  const context = await eventMatchesGuild(guildId, eventId);
+  if (!context.matches) return null;
+  return loadSavedPublication(guildId, eventId);
+}
+
+export async function loadEventPublicationHistoryAction(formData: FormData): Promise<
+  { ok: true; page: EventPublicationHistoryPage } | { ok: false; message: string }
+> {
+  const guildId = getString(formData, "guildId");
+  const eventId = getString(formData, "eventId");
+  const beforeText = getString(formData, "beforeVersion");
+  const maxText = getString(formData, "maxVersion");
+  const before = beforeText ? Number(beforeText) : null;
+  const max = maxText ? Number(maxText) : null;
+  if (!isValidEventUuid(guildId) || !isValidEventUuid(eventId) ||
+      [before, max].some((value) => value !== null && (!Number.isSafeInteger(value) || value < 1 || value > 2147483647))) {
+    return { ok: false, message: "The publication history identifiers are invalid." };
+  }
+  const context = await eventMatchesGuild(guildId, eventId);
+  if (!context.matches) return { ok: false, message: "This Event is unavailable for the selected Guild." };
+  const page = await loadEventPublicationHistoryPage(guildId, eventId, before, max);
+  return page ? { ok: true, page } : { ok: false, message: "Publication history could not be loaded. Try again." };
 }

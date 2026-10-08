@@ -1,3 +1,10 @@
+import type {
+  EventBuilderCharacter,
+} from "@/features/events/event-assignment";
+import type {
+  EventBuilderStructure,
+} from "@/features/events/event-builder";
+
 export type EventPublicationLifecycle =
   | "draft"
   | "published"
@@ -12,6 +19,34 @@ export type EventPublicationState = {
   unpublishedAt: string | null;
 };
 
+export type EventPublicationVersionSummary = {
+  id: string;
+  versionNumber: number;
+  eventName: string;
+  eventTypeName: string;
+  templateName: string;
+  usesAreas: boolean;
+  createdAt: string;
+  sealedAt: string;
+  slotCount: number;
+  assignmentCount: number;
+  isCurrent: boolean;
+};
+
+export type EventPublicationVersionSnapshot = {
+  version: EventPublicationVersionSummary;
+  description: string | null;
+  structure: EventBuilderStructure;
+  characters: EventBuilderCharacter[];
+};
+
+export type EventPublicationHistoryPage = {
+  versions: EventPublicationVersionSummary[];
+  totalVersions: number;
+  maxVersionNumber: number;
+  nextBeforeVersion: number | null;
+};
+
 export type EventPublicationUi = {
   statusLabel: string;
   detail: string;
@@ -24,6 +59,20 @@ export function getNextEventPublicationVersion(
   publication: EventPublicationState,
 ) {
   return (publication.latestVersionNumber ?? 0) + 1;
+}
+
+export function sortEventPublicationHistory(
+  history: EventPublicationVersionSummary[],
+) {
+  return [...history].sort(
+    (left, right) => right.versionNumber - left.versionNumber,
+  );
+}
+
+export function getEventPublicationVersionStatusLabel(
+  version: EventPublicationVersionSummary,
+) {
+  return version.isCurrent ? "Current member version" : "Historical";
 }
 
 export function getEventPublicationUi(

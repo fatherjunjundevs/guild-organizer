@@ -35,7 +35,9 @@ import {
   type EventBuilderWarning,
   type EventBuilderWarningReport,
 } from "@/features/events/event-warnings";
-import type { EventPublicationState } from "@/features/events/event-publication";
+import type {
+  EventPublicationState,
+} from "@/features/events/event-publication";
 import { EventPublicationPanel } from "@/features/events/event-publication-panel";
 
 type SelectedSlot = {
@@ -585,6 +587,7 @@ type EventBuilderBoardProps = {
   guildName: string;
   event: EventBuilderEvent;
   publication: EventPublicationState;
+  publicationHistoryCount: number;
   canPublish: boolean;
 };
 
@@ -593,6 +596,7 @@ function EventBuilderBoardContent({
   guildName,
   event,
   publication,
+  publicationHistoryCount,
   canPublish,
 }: EventBuilderBoardProps) {
   const pickerDialogRef = useRef<HTMLDialogElement>(null);
@@ -932,6 +936,7 @@ function EventBuilderBoardContent({
           event={event}
           characters={characters}
           initialPublication={publication}
+          initialHistoryCount={publicationHistoryCount}
           canPublish={canPublish}
           assignmentBusy={busySlotId !== ""}
           warningReport={warningReport}
@@ -1173,7 +1178,7 @@ export function EventBuilderBoard(props: EventBuilderBoardProps) {
 
   return (
     <EventBuilderBoardContent
-      key={`${props.event.updatedAt}:${assignmentVersion}:${props.publication.lifecycle}:${props.publication.currentVersionId ?? "none"}`}
+      key={`${props.event.updatedAt}:${assignmentVersion}:${props.publication.lifecycle}:${props.publication.currentVersionId ?? "none"}:${props.publicationHistoryCount}`}
       {...props}
     />
   );

@@ -67,6 +67,7 @@ export default async function EventBuilderPage({
       guildName={access.guildName}
       event={result.event}
       publication={result.publication}
+      publicationHistoryCount={result.publicationHistoryCount}
       canPublish={result.canPublish}
     />
   );

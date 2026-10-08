@@ -85,6 +85,15 @@ Template edits after Event creation must not silently restructure historical Eve
 
 Published versions are immutable snapshots and remain Phase 6 scope.
 
+### Phase 6.2B publication read and recovery decisions
+
+- Normal Event Builder loads read publication state, independently scoped latest/current version numbers, and an exact version total. They do not load historical seats, assignments, or version pages.
+- History loads on demand in descending version-number pages of 10. A maximum-version anchor and an exclusive before-version cursor keep page boundaries stable when another version is published. Each visible version uses exact, Guild/Event/version-scoped HEAD counts; seat and assignment rows are not downloaded to calculate history totals.
+- Selected sealed snapshots read each child table in deterministic ID order, in batches of 500. Exact counts and duplicate detection verify every batch. A failed or incomplete read returns an error instead of a partial board; version visibility is rechecked after the read. Display fields, including inactive status, come exclusively from the sealed snapshot.
+- Closing History invalidates pending responses and releases rendered history content. Read failures support retry, modal dismissal remains available while loading, and snapshot requests announce loading/completion.
+- After a confirmed publication mutation, a failed status reload is treated as a read failure. The UI hides obsolete status and offers a read-only recovery action. An interrupted mutation with unknown outcome follows the same recovery boundary; neither path automatically retries the write.
+- These decisions use the existing schema, session client, RLS, and immutable publication RPCs. No migration or broader release-readiness claim is implied. Visual QA and formal large-history performance budgets remain separate validation work.
+
 ## UI Architecture
 
 Prefer reusable shared primitives as the interface grows:

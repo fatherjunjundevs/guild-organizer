@@ -6,7 +6,9 @@ import type {
   EventBuilderCharacter,
   EventBuilderEvent,
 } from "@/features/events/event-assignment";
-import type { EventPublicationState } from "@/features/events/event-publication";
+import type {
+  EventPublicationState,
+} from "@/features/events/event-publication";
 import {
   canPublishEvent,
   loadEventPublicationState,
@@ -18,12 +20,14 @@ export type EventBuilderLoadResult =
       status: "ready";
       event: EventBuilderEvent;
       publication: EventPublicationState;
+      publicationHistoryCount: number;
       canPublish: boolean;
     }
   | {
       status: "forbidden" | "not-found" | "error";
       event: null;
       publication: null;
+      publicationHistoryCount: 0;
       canPublish: false;
     };
 
@@ -62,6 +66,7 @@ export async function loadEventBuilder(
       status: authorization,
       event: null,
       publication: null,
+      publicationHistoryCount: 0,
       canPublish: false,
     };
   }
@@ -81,6 +86,7 @@ export async function loadEventBuilder(
       status: "error",
       event: null,
       publication: null,
+      publicationHistoryCount: 0,
       canPublish: false,
     };
   }
@@ -90,6 +96,7 @@ export async function loadEventBuilder(
       status: "not-found",
       event: null,
       publication: null,
+      publicationHistoryCount: 0,
       canPublish: false,
     };
   }
@@ -151,6 +158,7 @@ export async function loadEventBuilder(
       status: "error",
       event: null,
       publication: null,
+      publicationHistoryCount: 0,
       canPublish: false,
     };
   }
@@ -183,6 +191,7 @@ export async function loadEventBuilder(
   return {
     status: "ready",
     publication: publicationResult.publication,
+    publicationHistoryCount: publicationResult.historyCount,
     canPublish: publishAuthorization === "allowed",
     event: {
       id: source.id,

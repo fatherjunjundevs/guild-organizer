@@ -19,10 +19,12 @@ import {
   getEventPublicationUi,
   type EventPublicationState,
 } from "@/features/events/event-publication";
+import { PublicationHistoryDialog } from "@/features/events/event-publication-history";
 import {
   publishEventAction,
   unpublishEventAction,
   updateEventPublicationAction,
+  refreshEventPublicationAction,
 } from "@/features/events/publication-actions";
 import type { EventBuilderWarningReport } from "@/features/events/event-warnings";
 
@@ -227,6 +229,7 @@ type EventPublicationPanelProps = {
   event: EventBuilderEvent;
   characters: EventBuilderCharacter[];
   initialPublication: EventPublicationState;
+  initialHistoryCount: number;
   canPublish: boolean;
   assignmentBusy: boolean;
   warningReport: EventBuilderWarningReport;
@@ -240,6 +243,7 @@ export function EventPublicationPanel({
   event,
   characters,
   initialPublication,
+  initialHistoryCount,
   canPublish,
   assignmentBusy,
   warningReport,
@@ -248,12 +252,14 @@ export function EventPublicationPanel({
   const previewDialogRef = useRef<HTMLDialogElement>(null);
   const unpublishDialogRef = useRef<HTMLDialogElement>(null);
   const [publication, setPublication] =
-    useState(initialPublication);
+    useState<EventPublicationState | null>(initialPublication);
+  const [historyCount, setHistoryCount] = useState(initialHistoryCount);
   const [busy, setBusy] = useState<
-    "publish" | "update" | "unpublish" | null
+    "publish" | "update" | "unpublish" | "refresh" | null
   >(null);
 
-  const ui = getEventPublicationUi(publication);
+  const [recoveryMessage, setRecoveryMessage] = useState("");
+  const ui = getEventPublicationUi(publication ?? initialPublication);
   const eventArchived = event.status === "archived";
   const canMutate = canPublish && !eventArchived;
   const mutationBlocked = assignmentBusy || busy !== null;
@@ -268,70 +274,80 @@ export function EventPublicationPanel({
     unpublishDialogRef.current?.showModal();
   }
 
-  async function confirmPublish() {
-    if (!canMutate || mutationBlocked) return;
-
-    const mode =
-      publication.lifecycle === "published"
-        ? "update"
-        : "publish";
-    setBusy(mode);
-    onFeedback(null);
-
+  function identifiers() {
     const data = new FormData();
     data.set("guildId", guildId);
     data.set("eventId", event.id);
+    return data;
+  }
 
-    const result =
-      mode === "update"
-        ? await updateEventPublicationAction(data)
-        : await publishEventAction(data);
-
-    setBusy(null);
-
-    if (!result.ok) {
-      onFeedback({ ok: false, message: result.message });
-      return;
-    }
-
-    if (result.publication) {
+  async function runMutation(mode: "publish" | "update" | "unpublish") {
+    setBusy(mode);
+    onFeedback(null);
+    try {
+      const data = identifiers();
+      const result = mode === "unpublish" ? await unpublishEventAction(data)
+        : mode === "update" ? await updateEventPublicationAction(data) : await publishEventAction(data);
+      if (!result.ok) {
+        onFeedback({ ok: false, message: result.message });
+        return;
+      }
       setPublication(result.publication);
+      setHistoryCount(result.historyCount ?? 0);
+      if (!result.publication) {
+        setRecoveryMessage("The publication change was saved, but its status could not be refreshed. Reload status before continuing; the change will not be repeated.");
+      }
+      previewDialogRef.current?.close();
+      unpublishDialogRef.current?.close();
+      onFeedback({ ok: true, message: result.message });
+    } catch {
+      // A transport failure may follow a committed RPC. Require a read-only
+      // recovery instead of retrying the mutation or displaying obsolete state.
+      setPublication(null);
+      setHistoryCount(0);
+      setRecoveryMessage("The publication request was interrupted. Its outcome is unknown. Reload status before continuing; the change will not be repeated.");
+      previewDialogRef.current?.close();
+      unpublishDialogRef.current?.close();
+    } finally {
+      setBusy(null);
     }
+  }
 
-    previewDialogRef.current?.close();
-    onFeedback({ ok: true, message: result.message });
+  async function confirmPublish() {
+    if (!publication || !canMutate || mutationBlocked) return;
+    await runMutation(publication.lifecycle === "published" ? "update" : "publish");
   }
 
   async function confirmUnpublish() {
-    if (
-      !canPublish ||
-      publication.lifecycle !== "published" ||
-      mutationBlocked
-    ) {
-      return;
+    if (!publication || !canPublish || publication.lifecycle !== "published" || mutationBlocked) return;
+    await runMutation("unpublish");
+  }
+
+  async function refreshPublication() {
+    setBusy("refresh");
+    try {
+      const saved = await refreshEventPublicationAction(identifiers());
+      if (!saved) throw new Error("Publication state unavailable");
+      setPublication(saved.publication);
+      setHistoryCount(saved.historyCount);
+      setRecoveryMessage("");
+      onFeedback({ ok: true, message: "Publication status refreshed." });
+    } catch {
+      setRecoveryMessage("Publication status is still unavailable. Try reloading status again. No publication change was repeated.");
+    } finally {
+      setBusy(null);
     }
+  }
 
-    setBusy("unpublish");
-    onFeedback(null);
-
-    const data = new FormData();
-    data.set("guildId", guildId);
-    data.set("eventId", event.id);
-
-    const result = await unpublishEventAction(data);
-    setBusy(null);
-
-    if (!result.ok) {
-      onFeedback({ ok: false, message: result.message });
-      return;
-    }
-
-    if (result.publication) {
-      setPublication(result.publication);
-    }
-
-    unpublishDialogRef.current?.close();
-    onFeedback({ ok: true, message: result.message });
+  if (!publication) {
+    return (
+      <Surface level={2} className="mt-4 p-4 sm:p-5">
+        <h2 className="text-lg font-semibold">Publication status unavailable</h2>
+        <p role="alert" className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{recoveryMessage}</p>
+        <Button type="button" variant="secondary" className="mt-3" disabled={busy !== null}
+          onClick={() => void refreshPublication()}>{busy === "refresh" ? "Reloading status?" : "Reload publication status"}</Button>
+      </Surface>
+    );
   }
 
   return (
@@ -366,6 +382,13 @@ export function EventPublicationPanel({
                 ? ui.previewButtonLabel
                 : "Preview lineup"}
             </Button>
+
+            <PublicationHistoryDialog
+              guildId={guildId}
+              eventId={event.id}
+              historyCount={historyCount}
+              disabled={busy !== null}
+            />
 
             {publication.lifecycle === "published" &&
             canPublish &&
