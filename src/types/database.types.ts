@@ -1221,6 +1221,9 @@ isOneToOne: false
               "change_kind": string,"character_id": string,"ign": string
             }[]
                            },
+"publish_event":
+{ Args: { "p_event_id": string }; Returns: string
+                           },
 "reconcile_roster_character":
 { Args: { "p_note"?: string,"p_source_character_id": string,"p_target_character_id": string,"p_triggering_sync_run_id"?: string }; Returns: string
                            },
@@ -1267,6 +1270,12 @@ isOneToOne: false
                            },
 "transfer_guild_ownership":
 { Args: { "p_guild_id": string,"p_new_owner_membership_id": string }; Returns: undefined
+                           },
+"unpublish_event":
+{ Args: { "p_event_id": string }; Returns: undefined
+                           },
+"update_event_publication":
+{ Args: { "p_event_id": string }; Returns: string
                            },
 "update_event_template":
 { Args: { "p_description": string,"p_event_type_id": string,"p_name": string,"p_status": string,"p_template_id": string,"p_uses_areas": boolean }; Returns: undefined
