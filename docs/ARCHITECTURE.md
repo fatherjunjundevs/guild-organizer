@@ -287,4 +287,6 @@ Do not describe security as finished until this gate is completed.
 
 ## Documentation Discipline
 
+Local browser fixtures use an automatic, per-test lifecycle with durable creation intents, admin-controlled ownership tags, exact Guild ownership verification, active-run leases and run-scoped PostgreSQL advisory locks. The local service role receives no new Guild deletion privileges. Verified local PostgreSQL cleanup removes restrictive dependents and Guilds before Auth Admin account deletion, preserving sealed-publication guards and production contracts. Cleanup/verification failures fail teardown alongside the original test error. Interrupted recovery and read-only historical inventories are documented in [LOCAL_E2E_FIXTURES.md](LOCAL_E2E_FIXTURES.md); historical records require separate approval. Detailed inventory snapshots stay in user-local storage outside every Git repository, with destination validation and ignore rules; repository review reports contain only sanitized aggregates and limitations.
+
 When a product or architecture decision changes, update the relevant repository document in the same checkpoint. Important decisions should not live only in chat history.

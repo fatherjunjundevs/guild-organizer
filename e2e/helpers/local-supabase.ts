@@ -1,8 +1,10 @@
-import { execSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import type { BrowserContext } from "@playwright/test";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
+
+import { fixtureRun } from "./test";
+import { ownershipTag, verifiedLocalEnvironment } from "./local-fixture-lifecycle";
 
 const APP_ORIGIN = process.env.APP_ORIGIN ?? "http://127.0.0.1:3000";
 
@@ -24,59 +26,10 @@ type RoleFixture = {
   cleanup: () => Promise<void>;
 };
 
-let cachedLocalEnv: LocalSupabaseEnv | null = null;
-
-function stripQuotes(value: string) {
-  if (
-    value.length >= 2 &&
-    ((value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'")))
-  ) {
-    return value.slice(1, -1);
-  }
-
-  return value;
-}
-
 function getLocalSupabaseEnv(): LocalSupabaseEnv {
-  if (cachedLocalEnv) return cachedLocalEnv;
-
-  let output: string;
-
-  try {
-    output = execSync("pnpm exec supabase status -o env", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  } catch {
-    throw new Error(
-      "Authenticated E2E requires the local Supabase stack. Run pnpm db:start first.",
-    );
-  }
-
-  const values = new Map<string, string>();
-
-  for (const line of output.split(/\r?\n/)) {
-    const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (!match) continue;
-
-    values.set(match[1], stripQuotes(match[2].trim()));
-  }
-
-  const apiUrl = values.get("API_URL");
-  const publishableKey =
-    values.get("PUBLISHABLE_KEY") ?? values.get("ANON_KEY");
-  const adminKey =
-    values.get("SERVICE_ROLE_KEY") ?? values.get("SECRET_KEY");
-
-  if (!apiUrl || !publishableKey || !adminKey) {
-    throw new Error(
-      "Local Supabase status did not provide the API URL and required local keys.",
-    );
-  }
-
-  cachedLocalEnv = { apiUrl, publishableKey, adminKey };
-  return cachedLocalEnv;
+  const env = verifiedLocalEnvironment();
+  if (env.target.fingerprint !== fixtureRun().record.target.fingerprint) throw new Error("Fixture target changed");
+  return env;
 }
 
 async function addSupabaseSessionCookies(
@@ -119,9 +72,11 @@ async function addSupabaseSessionCookies(
 
 async function createConfirmedSession(
   env: LocalSupabaseEnv,
-  email: string,
   displayName: string,
 ) {
+  const run = fixtureRun();
+  const intent = run.userIntent();
+  const email = intent.email;
   const admin = createClient(env.apiUrl, env.adminKey, {
     auth: {
       autoRefreshToken: false,
@@ -135,18 +90,24 @@ async function createConfirmedSession(
     },
   });
 
+  run.submitted(intent);
   const { data: createdUser, error: createUserError } =
     await admin.auth.admin.createUser({
       email,
       email_confirm: true,
+      app_metadata: { go_e2e_fixture: ownershipTag(run.record, intent) },
       user_metadata: {
         display_name: displayName,
       },
     });
 
   if (createUserError || !createdUser.user) {
+    if (createUserError?.status && [400, 401, 403, 404, 422].includes(createUserError.status)) run.rejected(intent);
     throw new Error("Unable to create the E2E account.");
   }
+
+  await run.registeredUser(intent, createdUser.user.id);
+  run.resource(async () => { await userClient.removeAllChannels(); userClient.auth.stopAutoRefresh(); });
 
   const { data: linkData, error: linkError } =
     await admin.auth.admin.generateLink({
@@ -155,12 +116,7 @@ async function createConfirmedSession(
     });
 
   if (linkError || !linkData.properties.hashed_token) {
-    await admin.auth.admin.deleteUser(createdUser.user.id);
-    throw new Error(
-      `Unable to generate E2E auth token: ${
-        linkError?.message ?? "missing token"
-      }`,
-    );
+    throw new Error("Unable to generate the E2E auth session.");
   }
 
   const { data: signInData, error: signInError } =
@@ -170,12 +126,7 @@ async function createConfirmedSession(
     });
 
   if (signInError || !signInData.session) {
-    await admin.auth.admin.deleteUser(createdUser.user.id);
-    throw new Error(
-      `Unable to authenticate E2E account: ${
-        signInError?.message ?? "missing session"
-      }`,
-    );
+    throw new Error("Unable to authenticate the E2E account.");
   }
 
   return {
@@ -190,46 +141,29 @@ export async function createAuthenticatedOwnerFixture(
   context: BrowserContext,
 ): Promise<OwnerFixture> {
   const env = getLocalSupabaseEnv();
-  const marker = randomUUID();
-  const email = `owner-e2e-${marker}@example.test`;
 
-  let userId: string | null = null;
-  let guildId: string | null = null;
-  const cleanupAdmin = createClient(env.apiUrl, env.adminKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  async function cleanupPartial() {
-    if (guildId) {
-      await cleanupAdmin.from("guilds").delete().eq("id", guildId);
-    }
-
-    if (userId) {
-      await cleanupAdmin.auth.admin.deleteUser(userId);
-    }
-  }
+  fixtureRun().resource(() => context.close());
+  async function cleanupPartial() { /* Checked database cleanup runs in automatic teardown. */ }
 
   try {
     const account = await createConfirmedSession(
       env,
-      email,
       "Roster E2E Owner",
     );
-    userId = account.userId;
 
+    const guildIntent = fixtureRun().guildIntent(account.userId);
+    fixtureRun().submitted(guildIntent);
     const { data: createdGuildId, error: createGuildError } =
       await account.userClient.rpc("create_guild", {
-        p_name: `Roster E2E ${marker.slice(0, 8)}`,
+        p_name: guildIntent.name,
       });
 
     if (createGuildError || !createdGuildId) {
+      if (createGuildError && /^[0-9A-Z]{5}$/.test(createGuildError.code)) fixtureRun().rejected(guildIntent);
       throw new Error("Unable to create the E2E Guild.");
     }
 
-    guildId = createdGuildId;
+    await fixtureRun().registeredGuild(guildIntent, createdGuildId);
 
     await addSupabaseSessionCookies(
       context,
@@ -258,55 +192,35 @@ export async function createAuthenticatedRoleFixture(
   const env = getLocalSupabaseEnv();
   const marker = randomUUID();
 
-  let ownerId: string | null = null;
-  let actorId: string | null = null;
   let guildId: string | null = null;
-  const cleanupAdmin = createClient(env.apiUrl, env.adminKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  async function cleanupPartial() {
-    if (guildId) {
-      await cleanupAdmin.from("guilds").delete().eq("id", guildId);
-    }
-
-    if (actorId) {
-      await cleanupAdmin.auth.admin.deleteUser(actorId);
-    }
-
-    if (ownerId) {
-      await cleanupAdmin.auth.admin.deleteUser(ownerId);
-    }
-  }
+  fixtureRun().resource(() => context.close());
+  async function cleanupPartial() { /* Checked database cleanup runs in automatic teardown. */ }
 
   try {
     const owner = await createConfirmedSession(
       env,
-      `role-owner-${marker}@example.test`,
       "Role Fixture Owner",
     );
-    ownerId = owner.userId;
 
+    const guildIntent = fixtureRun().guildIntent(owner.userId);
+    fixtureRun().submitted(guildIntent);
     const { data: createdGuildId, error: createGuildError } =
       await owner.userClient.rpc("create_guild", {
-        p_name: `Role E2E ${marker.slice(0, 8)}`,
+        p_name: guildIntent.name,
       });
 
     if (createGuildError || !createdGuildId) {
+      if (createGuildError && /^[0-9A-Z]{5}$/.test(createGuildError.code)) fixtureRun().rejected(guildIntent);
       throw new Error("Unable to create the role-fixture Guild.");
     }
 
+    await fixtureRun().registeredGuild(guildIntent, createdGuildId);
     guildId = createdGuildId;
 
     const actor = await createConfirmedSession(
       env,
-      `role-actor-${marker}@example.test`,
       `Role Fixture ${options.role}`,
     );
-    actorId = actor.userId;
 
     const tokenDigest = createHash("sha256")
       .update(`role-fixture-${marker}`)
@@ -403,8 +317,9 @@ export async function createEventSharingActorFixture(context: BrowserContext, ow
   role: "admin" | "officer" | "member", capabilities: string[] = []) {
   const env = getLocalSupabaseEnv();
   const marker = randomUUID();
-  const actor = await createConfirmedSession(env, `sharing-actor-${marker}@example.test`, "Sharing E2E actor");
-  async function cleanup() { await actor.admin.auth.admin.deleteUser(actor.userId); }
+  const actor = await createConfirmedSession(env, "Sharing E2E actor");
+  fixtureRun().resource(() => context.close());
+  async function cleanup() { /* Deferred to automatic teardown. */ }
   try {
     const digest = createHash("sha256").update(`sharing-invite-${marker}`).digest("hex");
     const { error: inviteError } = await owner.userClient.rpc("create_guild_invite", {
@@ -427,28 +342,11 @@ export async function createAuthenticatedEventBuilderFixture(
   context: BrowserContext,
 ): Promise<EventBuilderE2EFixture> {
   const env = getLocalSupabaseEnv();
-  const marker = randomUUID();
-  const email = `event-builder-e2e-${marker}@example.test`;
 
-  let userId: string | null = null;
   let guildId: string | null = null;
 
-  const cleanupAdmin = createClient(env.apiUrl, env.adminKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-
-  async function cleanupPartial() {
-    if (guildId) {
-      await cleanupAdmin.from("guilds").delete().eq("id", guildId);
-    }
-
-    if (userId) {
-      await cleanupAdmin.auth.admin.deleteUser(userId);
-    }
-  }
+  fixtureRun().resource(() => context.close());
+  async function cleanupPartial() { /* Checked database cleanup runs in automatic teardown. */ }
 
   function requireId(
     value: string | null,
@@ -467,22 +365,24 @@ export async function createAuthenticatedEventBuilderFixture(
   try {
     const account = await createConfirmedSession(
       env,
-      email,
       "Event Builder E2E Owner",
     );
-    userId = account.userId;
 
+    const guildIntent = fixtureRun().guildIntent(account.userId);
+    fixtureRun().submitted(guildIntent);
     const { data: createdGuildId, error: createGuildError } =
       await account.userClient.rpc("create_guild", {
-        p_name: `Event Builder E2E ${marker.slice(0, 8)}`,
+        p_name: guildIntent.name,
       });
 
+    if (createGuildError && /^[0-9A-Z]{5}$/.test(createGuildError.code)) fixtureRun().rejected(guildIntent);
     guildId = requireId(
       createdGuildId,
       createGuildError,
       "Guild",
     );
 
+    await fixtureRun().registeredGuild(guildIntent, guildId);
     await addSupabaseSessionCookies(
       context,
       env,

@@ -1,4 +1,4 @@
-import { expect as baseExpect, test } from "@playwright/test";
+import { expect as baseExpect, fixtureTest as test } from "./helpers/test";
 import { createAuthenticatedEventBuilderFixture, createEventSharingActorFixture } from "./helpers/local-supabase";
 
 const enabled = process.env.SHARE_LINK_INTERFACE_ENABLED === "true" && process.env.APP_ENV === "local";

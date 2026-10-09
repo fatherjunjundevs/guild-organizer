@@ -1,4 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
+import { verifiedLocalEnvironment } from "./e2e/helpers/local-fixture-lifecycle";
+
+const local = verifiedLocalEnvironment();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -20,7 +23,13 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: !process.env.CI && !process.env.SHARE_LINK_E2E_KEYS,
+    reuseExistingServer: false,
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL: local.apiUrl,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: local.publishableKey,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: local.publishableKey,
+      APP_ENV: "local",
+    },
     timeout: 120_000,
   },
 });

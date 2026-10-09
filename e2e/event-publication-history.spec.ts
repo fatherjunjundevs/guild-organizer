@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, fixtureTest as test } from "./helpers/test";
 import { createAuthenticatedEventBuilderFixture } from "./helpers/local-supabase";
 
 test("Publication history preserves immutable versions across updates and unpublish", async ({

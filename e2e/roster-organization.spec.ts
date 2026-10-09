@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, fixtureTest as test } from "./helpers/test";
 import { createAuthenticatedOwnerFixture } from "./helpers/local-supabase";
 
 test("owner manages manual roster metadata, tags, custom fields, and bulk status", async ({

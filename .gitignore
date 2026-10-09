@@ -44,3 +44,8 @@ next-env.d.ts
 
 playwright-report/
 test-results/
+
+# Detailed local database inventories belong outside every Git worktree.
+PHASE_6_3A_5B_HISTORICAL_FIXTURES.json
+PHASE_6_3A_5B_PROPOSED_DELETIONS.json
+fixture-inventories/

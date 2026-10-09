@@ -116,6 +116,8 @@ FUNCTIONAL / QUALITY-GATED COMPLETE
 
 ## Precise Status Language
 
+Local authenticated E2E must first pass `pnpm test:e2e:cleanup`. Use the guarded automatic fixture lifecycle; do not ignore deletion errors or use service-role Guild DELETE. Before/after fixture verification, failed-teardown evidence and exact interrupted-run recovery are part of the gate. Historical leftovers are inventoried separately and are not evidence of a clean database. See [LOCAL_E2E_FIXTURES.md](LOCAL_E2E_FIXTURES.md).
+
 Do not casually describe the product as "secure", "performance is excellent", "production ready", or "finished" unless the relevant gate has actually been measured/audited.
 
 Prefer precise wording such as:

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, fixtureTest as test } from "./helpers/test";
 import ExcelJS from "exceljs-hardened";
 import { createAuthenticatedOwnerFixture } from "./helpers/local-supabase";
 

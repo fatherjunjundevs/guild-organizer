@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+import { expect, fixtureTest as test } from "./helpers/test";
 import { createAuthenticatedOwnerFixture } from "./helpers/local-supabase";
 
 function editorDialog(page: Page) {

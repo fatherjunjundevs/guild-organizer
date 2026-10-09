@@ -20,7 +20,10 @@
     "db:test": "supabase test db",
     "db:test:concurrency": "node scripts/test-share-link-concurrency.mjs",
     "db:types": "node scripts/generate-database-types.mjs",
-    "db:types:check": "node scripts/generate-database-types.mjs --check"
+    "db:types:check": "node scripts/generate-database-types.mjs --check",
+    "test:e2e:cleanup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-local-fixture-cleanup.mjs",
+    "test:fixtures:list": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/local-fixtures.mjs list",
+    "test:fixtures:recover": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/local-fixtures.mjs recover"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

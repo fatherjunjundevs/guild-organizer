@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, fixtureTest as test } from "./helpers/test";
 import { createAuthenticatedRoleFixture } from "./helpers/local-supabase";
 
 test("member cannot enter Template management", async ({ page, context }) => {
