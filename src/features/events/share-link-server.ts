@@ -39,7 +39,7 @@ function rpcFailure(operation: ShareLinkOperation, code: string | undefined, req
   if (code === "42501") return failure(operation, "forbidden", requestedLinkId);
   if (code === "P0002") return failure(operation, "unavailable", requestedLinkId);
   if (["55000", "23505"].includes(code ?? "")) return failure(operation, "conflict", requestedLinkId);
-  if (["23514", "22P02", "57014", "40001", "40P01"].includes(code ?? "")) return failure(operation, "mutation_failed", requestedLinkId);
+  if (["23514", "22P02", "57014", "40001", "40P01", "55P03", "0A000"].includes(code ?? "")) return failure(operation, "mutation_failed", requestedLinkId);
   return failure(operation, operation === "state" || operation === "copy" ? "read_failed" : "mutation_unknown", requestedLinkId);
 }
 async function authenticate(operation: ShareLinkOperation): Promise<Context | ShareLinkFailure> {

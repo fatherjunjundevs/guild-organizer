@@ -124,6 +124,21 @@ describe("authenticated share-link operations", () => {
     expect(await createEventShareLink(scope)).toMatchObject({ ok: false, code: "mutation_unknown" });
     expect(mutations()).toHaveLength(1);
   });
+  it.each(["55P03", "0A000"].flatMap((code) => ["create", "rotate", "revoke"].map((operation) => [code, operation])))(
+    "treats %s from %s as a confirmed rejection requiring a read, without retrying", async (code, operation) => {
+      if (operation !== "create") active = linkId;
+      const base = mocks.rpc.getMockImplementation()!;
+      mocks.rpc.mockImplementation((name, args) => name === `${operation}_event_share_link`
+        ? { data: null, error: { code, message: "PRIVATE_AUTHORIZATION_AND_DATABASE_DETAIL" } } : base(name, args));
+      const result = operation === "create" ? await createEventShareLink(scope)
+        : operation === "rotate" ? await rotateEventShareLink({ ...scope, linkId }) : await revokeEventShareLink({ ...scope, linkId });
+      expect(result).toMatchObject({ ok: false, code: "mutation_failed", recovery: "read_state" });
+      expect(JSON.stringify(result)).not.toContain("PRIVATE_AUTHORIZATION");
+      expect(mutations()).toHaveLength(1); expect(mocks.retry).toHaveBeenCalledWith(false);
+      expect(active).toBe(operation === "create" ? null : linkId);
+      await readEventShareLinkState(scope); expect(mutations()).toHaveLength(1);
+    },
+  );
   it("does not sign stale rotations or duplicate create requests", async () => {
     active = linkId;
     expect(await createEventShareLink(scope)).toMatchObject({ ok: false, code: "conflict" });

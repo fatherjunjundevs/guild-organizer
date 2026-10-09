@@ -101,6 +101,20 @@ describe("EventShareLinkManager", () => {
     expect(screen.getByText("Status unknown")).toBeVisible();
     actions.read.mockResolvedValue({ ok: true, state: absent }); fireEvent.click(button("Reload Status")); await screen.findByText("No link created");
   });
+  it.each(["create", "rotate", "revoke"] as const)("clears verified state after a confirmed %s authority-lock rejection and reloads without retrying", async (operation) => {
+    if (operation === "create") actions.read.mockResolvedValue({ ok: true, state: absent });
+    actions[operation].mockResolvedValue({ ok: false, code: "mutation_failed", recovery: "read_state",
+      message: "The share-link change was rejected. Refresh its state before continuing." });
+    mount(); await open();
+    fireEvent.click(button(operation === "create" ? "Create Link" : operation === "rotate" ? "Rotate Link" : "Revoke Link"));
+    if (operation !== "create") fireEvent.click(button(operation === "rotate" ? "Rotate Link now" : "Revoke Link now"));
+    await screen.findByRole("alert"); expect(screen.getByText("Status unknown")).toBeVisible();
+    expect(screen.queryByText(operation === "create" ? "No link created" : "Active · published")).not.toBeInTheDocument();
+    expect(actions[operation]).toHaveBeenCalledOnce(); expect(actions.read).toHaveBeenCalledOnce();
+    actions.read.mockResolvedValue({ ok: true, state: revoked }); fireEvent.click(button("Reload Status"));
+    await screen.findByText("Link revoked"); expect(actions.read).toHaveBeenCalledTimes(2);
+    expect(actions[operation]).toHaveBeenCalledOnce();
+  });
   it.each([
     [absent, "No link created"], [revoked, "Link revoked"],
   ])("preserves verified %s state after Create configuration rejection without retrying", async (state, label) => {

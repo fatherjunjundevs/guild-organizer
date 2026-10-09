@@ -156,6 +156,17 @@ end; $context$;\n` + settings;
     throw new Error("Committed concurrency fixtures were not cleaned");
   }
   console.log("Concurrency: 16 assertions passed; committed fixtures cleaned.");
+  const authorityOutput = sql(database, context + readFileSync("supabase/concurrency-tests/event_share_link_authorization.test.sql", "utf8"), "postgres", true);
+  if (authorityOutput === null) throw new Error("Authorization concurrency SQL failed (sensitive details suppressed)");
+  const authorityResults = authorityOutput.split(/\r?\n/).filter((line) => /^(not )?ok \d+/.test(line));
+  console.log(authorityResults.join("\n"));
+  if (authorityResults.length !== 130 || authorityResults.some((line) => line.startsWith("not ok")) || !/^1\.\.130$/m.test(authorityOutput)) {
+    throw new Error("Authorization concurrency TAP assertions failed or incomplete");
+  }
+  if (sql(database, "select (select count(*) from public.guilds)+(select count(*) from auth.users)+(select count(*) from private.event_share_links);").trim() !== "0") {
+    throw new Error("Committed authorization fixtures were not cleaned");
+  }
+  console.log("Authorization concurrency: 130 assertions passed; committed fixtures cleaned.");
   testShareLinkServerIntegration({ modules: serverModules, key, sql, database });
 } catch (error) {
   failed = true;
