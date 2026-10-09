@@ -1203,6 +1203,11 @@ isOneToOne: false
               "encryption_key_id": string,"link_id": string,"token_auth_tag": string,"token_ciphertext": string,"token_digest": string,"token_nonce": string
             }[]
                            },
+"get_event_share_link_management_state":
+{ Args: { "p_event_id": string,"p_guild_id": string }; Returns: {
+              "available": boolean,"created_at": string,"link_id": string,"state": string
+            }[]
+                           },
 "get_event_share_link_state":
 { Args: { "p_event_id": string,"p_guild_id": string }; Returns: {
               "available": boolean,"created_at": string,"link_id": string
