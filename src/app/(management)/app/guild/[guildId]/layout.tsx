@@ -5,6 +5,8 @@ import {
   getGuildMembershipSummaries,
 } from "@/features/guilds/server";
 import { ManagementShell } from "@/features/guilds/management-shell";
+import { isShareLinkInterfaceEnabled } from "@/features/events/share-link-feature";
+import { canPublishEvent } from "@/features/events/publication-server";
 
 export default async function GuildManagementLayout({
   children,
@@ -33,8 +35,9 @@ export default async function GuildManagementLayout({
     redirect(access.destination);
   }
 
+  const canShare = isShareLinkInterfaceEnabled() && (await canPublishEvent(access)) === "allowed";
   return (
-    <ManagementShell access={access} memberships={memberships}>
+    <ManagementShell access={access} memberships={memberships} canShare={canShare}>
       {children}
     </ManagementShell>
   );

@@ -399,6 +399,30 @@ export type EventBuilderE2EFixture = {
   cleanup: () => Promise<void>;
 };
 
+export async function createEventSharingActorFixture(context: BrowserContext, owner: EventBuilderE2EFixture,
+  role: "admin" | "officer" | "member", capabilities: string[] = []) {
+  const env = getLocalSupabaseEnv();
+  const marker = randomUUID();
+  const actor = await createConfirmedSession(env, `sharing-actor-${marker}@example.test`, "Sharing E2E actor");
+  async function cleanup() { await actor.admin.auth.admin.deleteUser(actor.userId); }
+  try {
+    const digest = createHash("sha256").update(`sharing-invite-${marker}`).digest("hex");
+    const { error: inviteError } = await owner.userClient.rpc("create_guild_invite", {
+      p_guild_id: owner.guildId, p_invite_kind: role === "member" ? "join_link" : "elevated", p_role: role,
+      p_token_digest: digest, p_expires_at: new Date(Date.now()+3600000).toISOString(),
+    });
+    if (inviteError) throw new Error("Sharing actor invitation failed");
+    const { data: membership, error } = await actor.userClient.rpc("accept_guild_invite", { p_token_digest: digest, p_generation: 1 });
+    if (error || !membership) throw new Error("Sharing actor membership failed");
+    for (const capability of capabilities) {
+      const { error: grantError } = await owner.userClient.rpc("grant_officer_capability", { p_membership_id: membership, p_capability_key: capability });
+      if (grantError) throw new Error("Sharing actor capability failed");
+    }
+    await addSupabaseSessionCookies(context, env, actor.session.access_token, actor.session.refresh_token);
+    return { userClient: actor.userClient, cleanup };
+  } catch (error) { await cleanup(); throw error; }
+}
+
 export async function createAuthenticatedEventBuilderFixture(
   context: BrowserContext,
 ): Promise<EventBuilderE2EFixture> {

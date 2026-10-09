@@ -589,6 +589,7 @@ type EventBuilderBoardProps = {
   publication: EventPublicationState;
   publicationHistoryCount: number;
   canPublish: boolean;
+  sharingEnabled?: boolean;
 };
 
 function EventBuilderBoardContent({
@@ -598,6 +599,7 @@ function EventBuilderBoardContent({
   publication,
   publicationHistoryCount,
   canPublish,
+  sharingEnabled = false,
 }: EventBuilderBoardProps) {
   const pickerDialogRef = useRef<HTMLDialogElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -938,6 +940,7 @@ function EventBuilderBoardContent({
           initialPublication={publication}
           initialHistoryCount={publicationHistoryCount}
           canPublish={canPublish}
+          sharingEnabled={sharingEnabled}
           assignmentBusy={busySlotId !== ""}
           warningReport={warningReport}
           onFeedback={setResult}

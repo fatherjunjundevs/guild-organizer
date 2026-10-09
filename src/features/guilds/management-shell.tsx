@@ -12,10 +12,12 @@ export function ManagementShell({
   access,
   memberships,
   children,
+  canShare = false,
 }: {
   access: GuildAccess;
   memberships: GuildMembershipSummary[];
   children: React.ReactNode;
+  canShare?: boolean;
 }) {
   const roleLabel =
     access.role.charAt(0).toUpperCase() + access.role.slice(1);
@@ -44,7 +46,7 @@ export function ManagementShell({
           />
         </div>
 
-        <ManagementNav guildId={access.guildId} />
+        <ManagementNav guildId={access.guildId} canShare={canShare} />
 
         <div className="hidden px-3 pb-5 lg:block">
           <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">

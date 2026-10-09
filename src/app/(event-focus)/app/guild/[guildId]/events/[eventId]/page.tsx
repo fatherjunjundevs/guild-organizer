@@ -4,6 +4,9 @@ import { Surface } from "@/components/ui/surface";
 import { loadEventBuilder } from "@/features/events/builder-server";
 import { EventBuilderBoard } from "@/features/events/event-builder-board";
 import { getGuildAccess } from "@/features/guilds/server";
+import { isShareLinkInterfaceEnabled } from "@/features/events/share-link-feature";
+
+export const runtime = "nodejs";
 
 export default async function EventBuilderPage({
   params,
@@ -69,6 +72,7 @@ export default async function EventBuilderPage({
       publication={result.publication}
       publicationHistoryCount={result.publicationHistoryCount}
       canPublish={result.canPublish}
+      sharingEnabled={isShareLinkInterfaceEnabled()}
     />
   );
 }

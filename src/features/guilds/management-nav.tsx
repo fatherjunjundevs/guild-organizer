@@ -6,6 +6,7 @@ import { cn } from "@/lib/utilities/cn";
 
 type ManagementNavProps = {
   guildId: string;
+  canShare?: boolean;
 };
 
 const futureItems = ["History", "Settings"];
@@ -17,7 +18,7 @@ export function isManagementNavItemActive(
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function ManagementNav({ guildId }: ManagementNavProps) {
+export function ManagementNav({ guildId, canShare = false }: ManagementNavProps) {
   const pathname = usePathname();
 
   const items = [
@@ -38,6 +39,7 @@ export function ManagementNav({ guildId }: ManagementNavProps) {
       href: `/app/guild/${guildId}/events`,
     },
   ];
+  if (canShare) items.push({ label: "Sharing", href: `/app/guild/${guildId}/sharing` });
 
   return (
     <nav aria-label="Management" className="pb-4 lg:px-3 lg:pb-5">

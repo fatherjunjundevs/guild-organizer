@@ -16,3 +16,15 @@ export type ShareLinkMutationResult = {
   requestedLinkId: string; state: EventShareLinkState | null;
   refresh: "ready" | "required"; message: string;
 } | ShareLinkFailure;
+
+export type ShareLinkScopeInput = { guildId: string; eventId: string };
+export type ShareLinkIdentityInput = ShareLinkScopeInput & { linkId: string };
+export type EventShareLinkManagementState =
+  | { state: "absent" | "revoked"; linkId: null; createdAt: null; available: false }
+  | { state: "active"; linkId: string; createdAt: string; available: boolean };
+export type ShareLinkManagementResult =
+  | { ok: true; operation: "state"; state: EventShareLinkManagementState }
+  | ShareLinkFailure;
+export type ShareLinkManagementMutationResult =
+  | (Omit<Extract<ShareLinkMutationResult, { ok: true }>, "state"> & { state: EventShareLinkManagementState | null })
+  | ShareLinkFailure;

@@ -20,6 +20,7 @@ import {
   type EventPublicationState,
 } from "@/features/events/event-publication";
 import { PublicationHistoryDialog } from "@/features/events/event-publication-history";
+import { EventShareLinkManager } from "@/features/events/event-share-link-manager";
 import {
   publishEventAction,
   unpublishEventAction,
@@ -231,6 +232,7 @@ type EventPublicationPanelProps = {
   initialPublication: EventPublicationState;
   initialHistoryCount: number;
   canPublish: boolean;
+  sharingEnabled?: boolean;
   assignmentBusy: boolean;
   warningReport: EventBuilderWarningReport;
   onFeedback: (
@@ -245,6 +247,7 @@ export function EventPublicationPanel({
   initialPublication,
   initialHistoryCount,
   canPublish,
+  sharingEnabled = false,
   assignmentBusy,
   warningReport,
   onFeedback,
@@ -389,6 +392,11 @@ export function EventPublicationPanel({
               historyCount={historyCount}
               disabled={busy !== null}
             />
+
+            {sharingEnabled && canPublish ? <EventShareLinkManager
+              guildId={guildId} eventId={event.id} eventName={event.name}
+              archived={eventArchived} disabled={mutationBlocked}
+            /> : null}
 
             {publication.lifecycle === "published" &&
             canPublish &&

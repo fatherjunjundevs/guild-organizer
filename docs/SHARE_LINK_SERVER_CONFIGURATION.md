@@ -5,6 +5,7 @@ Phase 6.3A.3 introduces server-only code, without the organizer UI or anonymous 
 | Environment variable | Required use | Format |
 | --- | --- | --- |
 | `APP_ENV` | Existing application environment | `local`, `staging`, or `production` |
+| `SHARE_LINK_INTERFACE_ENABLED` | Organizer UI and Server Actions | Exact `true`, accepted only when `APP_ENV=local`; absent/other values disable sharing. No `NEXT_PUBLIC_` equivalent. |
 | `APP_ORIGIN` | Trusted URL construction | HTTPS origin only outside local mode; no credentials, path, query, or fragment. Local HTTP is restricted to localhost/loopback. |
 | `SHARE_LINK_PROVISIONING_KEY_ID` | Create/rotate | ASCII `[A-Za-z0-9_-]{1,32}` identifying a database provisioning-key row |
 | `SHARE_LINK_PROVISIONING_KEY_BASE64` | Create/rotate | Canonical padded standard base64 of exactly 32 random bytes: 44 characters, ending in `=` |
@@ -34,8 +35,26 @@ No production key provisioning commands are executed by repository tests. Unit f
 
 ## Calling the server operations
 
-The reusable operations in `src/features/events/share-link-server.ts` use the authenticated session client, validate input, and return sanitized DTOs. They are not exported Server Action or Route Handler endpoints at this checkpoint.
+The reusable operations in `src/features/events/share-link-server.ts` use the authenticated session client, validate input, and return sanitized DTOs. They are internal server-only functions; Phase 6.3A.4 adds gated Server Action wrappers in `share-link-actions.ts`.
 
-For Phase 6.3A.4, wrap these operations in authenticated Server Actions that accept only the required identifiers. Preserve `mutation_unknown` and confirmed-write/read-failure distinctions, show a read-only refresh path, and retain requested identities for comparison. Do not automatically retry create/rotate. Treat copy results as bearer credentials: return them only for explicit copy, keep them out of server-rendered HTML and general state, do not cache/log them, and never derive the URL origin from request headers.
+The Phase 6.3A.4 wrappers accept only the required identifiers, preserve `mutation_unknown` and confirmed-write/read-failure distinctions, and return safe management state after confirmed changes. The interface offers read-only refresh and targets the exact displayed identity for copy/rotation/revocation. No mutation is automatically retried. Copy results are bearer credentials: they are returned only for explicit copy, excluded from server-rendered HTML and general state, never cached/logged, and built from the trusted configured origin rather than request headers.
 
 The future anonymous route must consume the token from the fragment in the browser. No anonymous route is introduced here. Direct Supabase resolver abuse protection and sensitive-parameter-safe observability remain release blockers, alongside no-store/indexing/referrer controls for that future route.
+
+## Phase 6.3A.4 organizer interface and local testing
+
+The organizer interface is now implemented behind a default-disabled, local-only server gate. Owner/Admin and Officers with `publish.manage` see Sharing navigation and the minimal Guild-scoped selector. The draft Builder continues to require `events.manage`; its Share Link control additionally requires publishing authority. Every share-link action checks the gate independently and delegates to the authenticated server-only operations. Disabling the UI does not alter existing database RPC grants; this is an application interface gate, not a new database access policy.
+
+For authorized local work, set process-scoped variables in the shell that launches Next.js, without modifying any environment files:
+
+```powershell
+$env:APP_ENV = 'local'
+$env:SHARE_LINK_INTERFACE_ENABLED = 'true'
+pnpm dev
+```
+
+These variables enable state/revoke/UI testing without cryptographic keys. Create/rotate require the existing provisioning and recovery configuration; Copy requires the recovery configuration and trusted origin. Missing configuration produces sanitized feedback, never fallback keys or automatic rotation. Supply any separately provisioned local keys through a trusted process environment, not command arguments, checked-in files, or public variables. To disable the interface in this shell after stopping Next.js, remove its process variable with `Remove-Item Env:SHARE_LINK_INTERFACE_ENABLED`. A running server must be restarted when changing its environment.
+
+For the complete reproducible browser flow, stop any existing port-3000 server and run `pnpm test:e2e:sharing`. This runner verifies the exact local CLI container/project/workdir, generates separate random AES and provisioning keys in memory, installs a random test-only provisioning key with a 30-minute retirement bound, and launches a fresh local dev server with process-only configuration. It runs sharing HTTP/browser tests and the existing publication workflow, then deletes only its exact test key in `finally`. Test account/Guild fixtures are deleted by the E2E helpers. It does not accept production URLs, print key material, or edit environment files. Tracing/video/automatic screenshots are disabled for bearer-copy tests, automatic page snapshots are disabled by the runner, and the intentional mobile screenshot is taken only after the manual URL field is cleared. An interrupted runner's test key expires within 30 minutes; privileged local cleanup may remove its `local_e2e_` record after verifying ownership. Do not use this runner against production.
+
+All enabled UI states say Development only. The `/share/event` page does not exist yet: copied links are not ready to send to members. Staging and production remain disabled even if the flag is set to `true`. Public-page implementation, direct Data API abuse controls, sensitive-safe observability, no-store behavior, indexing/referrer protection, and independent review remain separate release work.

@@ -5,6 +5,7 @@ const actions = vi.hoisted(() => ({ publish: vi.fn(), update: vi.fn(), unpublish
 vi.mock("./publication-actions", () => ({ publishEventAction: actions.publish, updateEventPublicationAction: actions.update,
   unpublishEventAction: actions.unpublish, refreshEventPublicationAction: actions.refresh }));
 vi.mock("./event-publication-history", () => ({ PublicationHistoryDialog: () => null }));
+vi.mock("./event-share-link-manager", () => ({ EventShareLinkManager: () => <button>Share Link</button> }));
 import { EventPublicationPanel } from "./event-publication-panel";
 
 beforeEach(() => { installTestDialogs(); vi.resetAllMocks(); });
