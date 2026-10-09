@@ -1,7 +1,9 @@
 // Only creates/drops runner-owned empty databases in the verified local CLI container.
 // Production URLs and credentials are neither accepted nor printed.
 import { spawnSync } from "node:child_process";
-import { createHmac, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
+import { loadShareLinkTestModules } from "./load-share-link-test-modules.mjs";
+import { testShareLinkServerIntegration } from "./test-share-link-server-integration.mjs";
 import { readFileSync, readdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
@@ -94,10 +96,13 @@ try {
   const guild = "6d100000-0000-4000-8000-000000000001";
   const event = "6d500000-0000-4000-8000-000000000001";
   const old = "6d800000-0000-4000-8000-000000000001";
+  const serverModules = loadShareLinkTestModules();
+  const provisioningConfig = new serverModules.config.ShareLinkProvisioningConfig("concurrency_test", key);
   function mac(op, link, previous, digest, nonce) {
-    const message = ["go.share.provision.v1", op, actor, guild, event, link, previous || "-", digest,
-      "ab".repeat(32), nonce.repeat(12), "cd".repeat(16), "test_key", "concurrency_test", String(expiry)].join("\n");
-    return createHmac("sha256", key).update(message, "utf8").digest("hex");
+    return serverModules.crypto.signShareLinkProvisioning({ operation: op, actorId: actor, guildId: guild,
+      eventId: event, linkId: link, previousLinkId: previous, envelope: { digest,
+        ciphertext: Buffer.alloc(32, 0xab), nonce: Buffer.from(nonce.repeat(12), "hex"),
+        authTag: Buffer.alloc(16, 0xcd), encryptionKeyId: "test_key" } }, provisioningConfig, (expiry - 120) * 1000).mac.toString("hex");
   }
   const proofs = {
     create: mac("create", old, null, "1".repeat(64), "ef"),
@@ -151,6 +156,7 @@ end; $context$;\n` + settings;
     throw new Error("Committed concurrency fixtures were not cleaned");
   }
   console.log("Concurrency: 16 assertions passed; committed fixtures cleaned.");
+  testShareLinkServerIntegration({ modules: serverModules, key, sql, database });
 } catch (error) {
   failed = true;
   console.error(redact(error.message));
