@@ -2,6 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
+-- The owned disposable runner supplies test-only pgTAP schema access.
 
 -- Disposable test key; transaction rollback removes it. Never used by the app.
 insert into private.event_share_link_provisioning_keys(id,key_material,activated_at)
@@ -190,8 +191,8 @@ select unnest(array[ok(p.prosecdef,'resolve_event_share_link uses the audited de
   is(p.proconfig,array['search_path=""']::text[],'resolve_event_share_link has empty search_path'),
   is(pg_get_userbyid(p.proowner),'postgres','resolve_event_share_link trusted owner'),
   ok(not exists(select 1 from aclexplode(p.proacl) a where a.grantee=0 and a.privilege_type='EXECUTE'),'resolve_event_share_link has no PUBLIC execute'),
-  ok(has_function_privilege('authenticated',p.oid,'EXECUTE'),'resolve_event_share_link authenticated grant'),
-  is(has_function_privilege('anon',p.oid,'EXECUTE'),true,'resolve_event_share_link anonymous grant'),
+  ok(not has_function_privilege('authenticated',p.oid,'EXECUTE'),'resolve_event_share_link denies authenticated execution'),
+  is(has_function_privilege('anon',p.oid,'EXECUTE'),false,'resolve_event_share_link denies anonymous execution'),
   ok(not has_function_privilege('service_role',p.oid,'EXECUTE'),'resolve_event_share_link needs no service-role execution')])
 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='resolve_event_share_link';
 
@@ -428,7 +429,11 @@ select throws_ok($$select pg_temp.share_create('6c800000-0000-4000-8000-00000000
 select throws_ok($$select pg_temp.share_create('6c800000-0000-4000-8000-000000000002',2)$$,'55000',null,'second active link rejected');
 select is((select link_id from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),'6c800000-0000-4000-8000-000000000001'::uuid,'state identifies active link');
 select is((select available from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),false,'prepublication link is unavailable');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(1))),0::bigint,'prepublication bearer has no public data');
+reset role;
+set local role authenticated;
 select is((select token_ciphertext from public.get_event_share_link_copy_payload('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000001')),decode(repeat('ab',32),'hex'),'authorized copy returns opaque ciphertext');
 select is((select token_digest from public.get_event_share_link_copy_payload('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000001')),pg_temp.share_digest(1),'copy includes digest for later server verification');
 select is((select count(*) from public.get_event_share_link_copy_payload('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000002','6c800000-0000-4000-8000-000000000001')),0::bigint,'copy cannot mix Event and link identifiers');
@@ -497,22 +502,41 @@ select set_config('test.share_v1_header',(select row_to_json(v)::text from publi
 select set_config('test.share_v1_slots',(select jsonb_agg(to_jsonb(s) order by s.id)::text from public.event_publication_slots s where s.publication_version_id=current_setting('test.share_v1')::uuid),true);
 select set_config('test.share_v1_assignments',(select jsonb_agg(to_jsonb(a) order by a.id)::text from public.event_publication_assignments a where a.publication_version_id=current_setting('test.share_v1')::uuid),true);
 set local role anon;
-select is((select event_name from public.resolve_event_share_link(pg_temp.share_token(1))),'League Week 1','anonymous bearer resolves sealed v1');
+reset role;
+set local role go_event_share_resolver;
+select is((select event_name from public.resolve_event_share_link(pg_temp.share_token(1))),'League Week 1','internal bearer resolves sealed v1');
+
 select is((select event_type_name from public.resolve_event_share_link(pg_temp.share_token(1))),'Guild League','Event Type comes from snapshot');
-select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(1))),1,'anonymous v1 number');
+
+select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(1))),1,'internal v1 number');
+
 select ok((select published_at is not null from public.resolve_event_share_link(pg_temp.share_token(1))),'public publication timestamp');
-select is((select array_agg(k order by k) from public.resolve_event_share_link(pg_temp.share_token(1)) r cross join lateral jsonb_object_keys(to_jsonb(r)) k),array['event_name','event_type_name','published_at','version_number']::text[],'actual anonymous row exposes only approved fields');
+
+select is((select array_agg(k order by k) from public.resolve_event_share_link(pg_temp.share_token(1)) r cross join lateral jsonb_object_keys(to_jsonb(r)) k),array['event_name','event_type_name','published_at','version_number']::text[],'actual internal row exposes only approved fields');
+
 select is((select count(*) from public.resolve_event_share_link(null)),0::bigint,'null: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link('')),0::bigint,'empty: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(999))),0::bigint,'unknown canonical token: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_digest(1))),0::bigint,'digest as token: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(1)||'=')),0::bigint,'padded token: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(' '||pg_temp.share_token(1))),0::bigint,'leading whitespace: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(replace(pg_temp.share_token(1),'v1.','v2.'))),0::bigint,'unsupported version: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link('v1.'||repeat('A',42)||'B')),0::bigint,'nonzero base64 padding bits: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link('v1.'||repeat('A',41)||'+A')),0::bigint,'non-url alphabet: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link('v1.'||repeat('A',42))),0::bigint,'short encoding: uniform unavailable result');
+
 select is((select count(*) from public.resolve_event_share_link(repeat('x',100000))),0::bigint,'oversized token: uniform unavailable result');
+reset role;
+set local role anon;
 reset role;
 update public.events set name='Draft Week 2', description='PRIVATE draft note' where id='6c500000-0000-4000-8000-000000000001';
 update public.characters set ign='PRIVATE roster renamed', gear_score=999999 where id='6c600000-0000-4000-8000-000000000001';
@@ -521,39 +545,81 @@ set local role anon;
 reset role;
 update private.event_share_link_provisioning_keys set retired_at=clock_timestamp() where id='sql_test_v1';
 set local role anon;
+reset role;
+set local role go_event_share_resolver;
 select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(1))),1,'issued link resolves while provisioning key is retired');
+reset role;
+set local role anon;
 reset role;
 update private.event_share_link_provisioning_keys set retired_at=null where id='sql_test_v1';
 set local role anon;
+reset role;
+set local role go_event_share_resolver;
 select is((select event_name from public.resolve_event_share_link(pg_temp.share_token(1))),'League Week 1','draft edits never change public v1');
+
 select ok((select to_jsonb(r)::text not like '%PRIVATE%' from public.resolve_event_share_link(pg_temp.share_token(1)) r),'private draft/roster values do not leak');
+reset role;
+set local role anon;
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub='6c000000-0000-4000-8000-000000000003';
 select set_config('test.share_v2',public.update_event_publication('6c500000-0000-4000-8000-000000000001')::text,true);
+reset role;
+set local role go_event_share_resolver;
 select is((select event_name from public.resolve_event_share_link(pg_temp.share_token(1))),'Draft Week 2','same token follows explicit v2 update');
+reset role;
+set local role authenticated;
+reset role;
+set local role go_event_share_resolver;
 select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(1))),2,'same token returns v2, not historical v1');
-select is((select published_at from public.resolve_event_share_link(pg_temp.share_token(1))),(select published_at from public.event_publications where event_id='6c500000-0000-4000-8000-000000000001'),'resolver timestamp is current publication timestamp');
+reset role;
+set local role authenticated;
+select set_config('test.resolver_published_at',(select published_at::text from public.event_publications where event_id='6c500000-0000-4000-8000-000000000001'),true);
+reset role;
+set local role go_event_share_resolver;
+select is((select published_at from public.resolve_event_share_link(pg_temp.share_token(1))),current_setting('test.resolver_published_at')::timestamptz,'resolver timestamp is current publication timestamp');
+reset role;
+set local role authenticated;
 select lives_ok($$select public.unpublish_event('6c500000-0000-4000-8000-000000000001')$$,'unpublish succeeds');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(1))),0::bigint,'unpublish removes bearer availability');
+reset role;
+set local role authenticated;
 select is((select available from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),false,'management availability follows unpublish');
 select is((select link_id from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),'6c800000-0000-4000-8000-000000000001'::uuid,'unpublish retains link identity');
 select set_config('test.share_v3',public.publish_event('6c500000-0000-4000-8000-000000000001')::text,true);
+reset role;
+set local role go_event_share_resolver;
 select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(1))),3,'republish restores same non-revoked token at v3');
+reset role;
+set local role authenticated;
 select is((select available from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),true,'state reports available sealed publication');
 select throws_ok($$select pg_temp.share_rotate('6c800000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000002',1)$$,'23505',null,'duplicate digest rotation rolls back');
 select is((select link_id from public.get_event_share_link_state('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001')),'6c800000-0000-4000-8000-000000000001'::uuid,'failed rotation leaves old link active');
 select is((select count(*) from public.get_event_share_link_copy_payload('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000001')),1::bigint,'failed rotation retains recovery envelope');
 select throws_ok($$select pg_temp.attested_rotate('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000002',pg_temp.share_digest(2),decode('ab','hex'),decode(repeat('ef',12),'hex'),decode(repeat('cd',16),'hex'),'test_key_v1')$$,'23514',null,'malformed replacement also rolls back revocation');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(1))),1::bigint,'malformed rotation leaves old bearer valid');
+reset role;
+set local role authenticated;
 do $$ begin perform set_config('test.share_rotate_replay',pg_temp.frozen_request('rotate','6c800000-0000-4000-8000-000000000002','6c800000-0000-4000-8000-000000000001',2),true); end; $$;
 select is(pg_temp.run_request(current_setting('test.share_rotate_replay')),'6c800000-0000-4000-8000-000000000002'::uuid,'publish.manage Officer rotates atomically');
 select throws_ok(current_setting('test.share_rotate_replay'),'55000',null,'exact rotation proof replay cannot override its replacement');
 set local request.jwt.claim.sub='6c000000-0000-4000-8000-000000000001';
 select throws_ok(current_setting('test.share_create_replay'),'55000',null,'exact creation proof replay cannot resurrect rotated link');
 set local request.jwt.claim.sub='6c000000-0000-4000-8000-000000000003';
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(1))),0::bigint,'rotation invalidates old token');
+reset role;
+set local role authenticated;
+reset role;
+set local role go_event_share_resolver;
 select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(2))),3,'replacement resolves existing current v3');
+reset role;
+set local role authenticated;
 select is((select count(*) from public.get_event_share_link_copy_payload('6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000001')),0::bigint,'rotated recovery cannot be retrieved');
 select throws_ok($$select pg_temp.share_rotate('6c800000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000003',3)$$,'55000',null,'competing stale rotation cannot replace winner');
 select lives_ok($$select pg_temp.share_revoke('6c800000-0000-4000-8000-000000000001')$$,'stale revoke against old link is harmless');
@@ -576,7 +642,11 @@ select throws_ok($$update private.event_share_links set revocation_reason='revok
 select throws_ok($$update private.event_share_links set created_by=null where id='6c800000-0000-4000-8000-000000000002'$$,'55000',null,'live creation actor cannot be cleared');
 update public.events set status='archived' where id='6c500000-0000-4000-8000-000000000001';
 set local role anon;
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(2))),0::bigint,'archived Event unavailable');
+reset role;
+set local role anon;
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub='6c000000-0000-4000-8000-000000000006';
@@ -595,7 +665,11 @@ select is(pg_temp.share_create('6c800000-0000-4000-8000-000000000003',3),'6c8000
 reset role;
 update public.guilds set status='archived' where id='6c100000-0000-4000-8000-000000000001';
 set local role anon;
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(3))),0::bigint,'inactive Guild unavailable');
+reset role;
+set local role anon;
 reset role;
 set local role authenticated;
 set local request.jwt.claim.sub='6c000000-0000-4000-8000-000000000001';
@@ -617,8 +691,13 @@ select is((select count(*) from private.event_share_links where event_id='6c5000
 delete from public.events where id='6c500000-0000-4000-8000-000000000002';
 select is((select count(*) from private.event_share_links where event_id='6c500000-0000-4000-8000-000000000002'),0::bigint,'Event cascade cleans link history');
 set local role anon;
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.share_token(2))),0::bigint,'revoked token stays unavailable after restoring active Event');
+
 select is((select version_number from public.resolve_event_share_link(pg_temp.share_token(3))),3,'fresh bearer still resolves current sealed version');
+reset role;
+set local role anon;
 reset role;
 select is(encode(pg_temp.provisioning_mac('create','6c000000-0000-4000-8000-000000000001','6c100000-0000-4000-8000-000000000001','6c500000-0000-4000-8000-000000000001','6c800000-0000-4000-8000-000000000099',null,repeat('a',64),decode(repeat('ab',32),'hex'),decode(repeat('ef',12),'hex'),decode(repeat('cd',16),'hex'),'test_key_v1','sql_test_v1',1800000000),'hex'),'88e196da02a40433791af57fce376f7cd19838d8d9f9ccf30eba0a8ce0ce5027','Node UTF-8 HMAC golden vector matches SQL encoding');
 

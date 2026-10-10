@@ -3,6 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 select no_plan();
+-- The owned disposable runner supplies test-only pgTAP schema access.
 
 select unnest(array[
   ok(p.prosecdef, 'management state uses the audited definer boundary'),
@@ -119,6 +120,7 @@ $check$;
 
 set local role authenticated;
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000001';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'Owner denied direct resolver execution');
 select * from pg_temp.check_state('absent',null,false,'Owner reads never-created Event');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000099')$$,'P0002',null,'missing Event rejected');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001',null)$$,'P0002',null,'null Event rejected');
@@ -128,13 +130,19 @@ select is((select link_id from public.get_event_share_link_state('6e100000-0000-
 select is((select count(*) from public.get_event_share_link_copy_payload('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001',pg_temp.link_id(1))),1::bigint,'existing copy contract still available');
 
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000002';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'Admin denied direct resolver execution');
 select * from pg_temp.check_state('active',1,false,'Admin reads active state');
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000003';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'publish.manage Officer denied direct resolver execution');
 select * from pg_temp.check_state('active',1,false,'publish.manage-only Officer reads active state');
 select throws_ok($$select * from private.event_share_links$$,'42501',null,'publisher cannot read link history directly');
 select lives_ok($$select public.publish_event('6e500000-0000-4000-8000-000000000001')$$,'existing publication RPC succeeds');
 select * from pg_temp.check_state('active',1,true,'published active link is available');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.token(1))),1::bigint,'resolver agrees with available state');
+reset role;
+set local role authenticated;
 reset role;
 select is((select created_at from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')),
   (select created_at from private.event_share_links where id=pg_temp.link_id(1)), 'exact active creation timestamp');
@@ -143,7 +151,11 @@ select set_config('test.state.sealed_before',(select jsonb_agg(to_jsonb(v) order
 set local role authenticated;
 select lives_ok($$select public.unpublish_event('6e500000-0000-4000-8000-000000000001')$$,'existing unpublish RPC succeeds');
 select * from pg_temp.check_state('active',1,false,'unpublished link retains identity without availability');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.token(1))),0::bigint,'unpublished bearer cannot resolve');
+reset role;
+set local role authenticated;
 select lives_ok($$select public.revoke_event_share_link('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001',pg_temp.link_id(1))$$,'existing revoke succeeds');
 select * from pg_temp.check_state('revoked',null,false,'revoked differs from absent and unpublished active');
 select is((select link_id from public.get_event_share_link_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')),null::uuid,'legacy revoked state remains unchanged');
@@ -164,19 +176,27 @@ reset role;
 update public.events set status='archived' where guild_id='6e100000-0000-4000-8000-000000000001';
 set local role authenticated;
 select * from pg_temp.check_state('active',4,false,'archived Event retains active identity but cannot resolve');
+reset role;
+set local role go_event_share_resolver;
 select is((select count(*) from public.resolve_event_share_link(pg_temp.token(4))),0::bigint,'resolver agrees for archived Event');
+reset role;
+set local role authenticated;
 select ok((select state='absent' and not available from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000002')),'archived never-created Event remains absent');
 select lives_ok($$select public.revoke_event_share_link('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001',pg_temp.link_id(4))$$,'archived Event can still revoke');
 select * from pg_temp.check_state('revoked',null,false,'archived revoked Event remains readable');
 
 -- Actual authenticated JWT identities, including an authorized foreign Guild.
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000004';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'events.manage Officer denied direct resolver execution');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')$$,'42501',null,'events.manage-only Officer denied');
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000005';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'Member denied direct resolver execution');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')$$,'42501',null,'Member denied');
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000007';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'inactive Officer denied direct resolver execution');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')$$,'42501',null,'inactive publish.manage Officer denied');
 set local request.jwt.claim.sub='6e000000-0000-4000-8000-000000000006';
+select throws_ok($$select * from public.resolve_event_share_link('malformed')$$,'42501',null,'foreign Owner denied direct resolver execution');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e100000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')$$,'42501',null,'foreign Guild Owner denied');
 select throws_ok($$select * from public.get_event_share_link_management_state('6e200000-0000-4000-8000-000000000001','6e500000-0000-4000-8000-000000000001')$$,'P0002',null,'authorized Guild cannot select another Guild Event');
 set local request.jwt.claim.sub='';

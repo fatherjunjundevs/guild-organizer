@@ -14,7 +14,7 @@ Phase 6.3A.3 introduces server-only code, without the organizer UI or anonymous 
 
 None of the secret variable names use `NEXT_PUBLIC_`. The provisioning key must differ from every recovery key. There are no fallback/default keys. Active AES IDs must exist in the keyring. Unknown recovery IDs fail without rotating a link. `test_` and `local_` key-ID prefixes are rejected outside local mode. This prefix check supplements operational separation; it cannot identify a test key relabeled as production.
 
-Provisioning and recovery configuration load only when needed. Application build, authorized state reads, and revocation do not require share-link keys. Copy can continue while HMAC provisioning is unavailable, provided its recovery key and origin remain configured. Anonymous PostgreSQL resolution does not require either key family.
+Provisioning and recovery configuration load only when needed. Application build, authorized state reads, and revocation do not require share-link keys. Copy can continue while HMAC provisioning is unavailable, provided its recovery key and origin remain configured. Internal PostgreSQL resolution does not require either key family; after Phase 6.3A.5C.1, direct anonymous/authenticated Data API execution is denied.
 
 ## Operational provisioning
 
@@ -39,7 +39,7 @@ The reusable operations in `src/features/events/share-link-server.ts` use the au
 
 The Phase 6.3A.4 wrappers accept only the required identifiers, preserve `mutation_unknown` and confirmed-write/read-failure distinctions, and return safe management state after confirmed changes. The interface offers read-only refresh and targets the exact displayed identity for copy/rotation/revocation. No mutation is automatically retried. Copy results are bearer credentials: they are returned only for explicit copy, excluded from server-rendered HTML and general state, never cached/logged, and built from the trusted configured origin rather than request headers.
 
-The future anonymous route must consume the token from the fragment in the browser. No anonymous route is introduced here. Direct Supabase resolver abuse protection and sensitive-parameter-safe observability remain release blockers, alongside no-store/indexing/referrer controls for that future route.
+The future anonymous route must consume the token from the fragment in the browser. No anonymous route is introduced here. Phase 6.3A.5C.1 removes direct Data API execution through an additive migration; until that migration is applied, the earlier grants remain in the target. A controlled server adapter, distributed abuse protection and sensitive-parameter-safe observability remain release blockers, alongside no-store/indexing/referrer controls for that future route.
 
 ## Phase 6.3A.4 organizer interface and local testing
 
@@ -58,3 +58,21 @@ These variables enable state/revoke/UI testing without cryptographic keys. Creat
 For the complete reproducible browser flow, stop any existing port-3000 server and run `pnpm test:e2e:sharing`. This runner verifies the exact local CLI container/project/workdir, generates separate random AES and provisioning keys in memory, installs a random test-only provisioning key with a 30-minute retirement bound, and launches a fresh local dev server with process-only configuration. It runs sharing HTTP/browser tests and the existing publication workflow, then deletes only its exact test key in `finally`. Test account/Guild fixtures use the guarded automatic lifecycle described in [LOCAL_E2E_FIXTURES.md](LOCAL_E2E_FIXTURES.md); checked Guild-before-Auth teardown and remaining-record verification fail the test run on cleanup errors. Run `pnpm test:e2e:cleanup` before broad browser validation. It does not accept production URLs, print key material, or edit environment files. Tracing/video/automatic screenshots are disabled for bearer-copy tests, automatic page snapshots are disabled by the runner, and the intentional mobile screenshot is taken only after the manual URL field is cleared. An interrupted runner's test key expires within 30 minutes; privileged local cleanup may remove its `local_e2e_` record after verifying ownership. Do not use this runner against production.
 
 All enabled UI states say Development only. The `/share/event` page does not exist yet: copied links are not ready to send to members. Staging and production remain disabled even if the flag is set to `true`. Public-page implementation, direct Data API abuse controls, sensitive-safe observability, no-store behavior, indexing/referrer protection, and independent review remain separate release work.
+
+## Internal resolver boundary (Phase 6.3A.5C.1)
+
+The new migration creates `go_event_share_resolver` as NOLOGIN/NOINHERIT with no elevated role attributes. Its explicit grants are public schema USAGE and EXECUTE on `public.resolve_event_share_link(text)`. PUBLIC, anon, authenticated and service_role cannot execute that function after application, even when the authenticated user is an Owner. Existing organizer management grants and PostgreSQL publish.manage checks remain intact. No credential or application connection to this internal role is implemented in this checkpoint.
+
+The role is not a service-role substitute. The future server connection must be separately provisioned with only the reviewed internal resolver authority, parameterized SQL, verified TLS outside the verified local environment, bounded pool/acquisition/query timeouts and appropriate pooler compatibility. Review existing PUBLIC/default privileges and role memberships before provisioning; NOINHERIT does not remove PUBLIC privileges or by itself prohibit SET ROLE. Never grant this role to authenticator, anon, authenticated or service_role. Never store credentials in migrations, manifests, command arguments or repository files.
+
+Migration ordering:
+
+1. Keep public access gates closed and independently review the new migration.
+2. Verify the target and that the role name is absent. Every collision fails closed; do not alter/drop an existing role to make deployment succeed. This includes genuine roles already deployed in another database in the cluster.
+3. Apply the transactional migration in the approved target. Verify unchanged resolver definition, effective grants, role attributes and memberships. Account for requests already in flight during a real deployment.
+4. Refresh the Data API schema cache and test GET/HEAD/POST authorization denial for anonymous, authenticated and service-role callers. An empty successful response does not prove denial.
+5. Provision/enable the future dedicated connection only under separate approval. Public resolution stays unavailable until the controlled adapter, trusted ingress, distributed admission and logging/caching/referrer/indexing safeguards pass.
+
+Rollback must fail closed: disable the future adapter and revoke its access where necessary. Do not restore anon/authenticated/PUBLIC grants, change cryptographic contracts or remove publication history. Do not drop a shared role without independent ownership and dependency verification. No production provisioning or deployment is performed by the validation runner.
+
+Current checkpoint validation uses the existing guarded disposable database runner, including all SQL tests, actual-role resolver checks, real concurrent sessions and production TypeScript crypto. It does **not** apply this migration to the existing development database. Updated browser denial expectations therefore remain pending, along with actual Data API GET/HEAD/POST denial. See [validation evidence](reviews/PHASE_6_3A_5C_1_VALIDATION.md). The ordinary `pnpm db:test` and browser suite must not be used to claim the new boundary is deployed while local migration application remains unapproved.

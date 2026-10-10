@@ -65,6 +65,10 @@ test("Owner manages authenticated link lifecycle with manual copy and responsive
     expect((await fixture.userClient.rpc("get_event_share_link_management_state", { p_guild_id: fixture.guildId, p_event_id: fixture.eventId })).data?.[0].state).toBe("absent");
     await dialog.getByRole("button", { name: "Create Link", exact: true }).click();
     await expect(dialog.getByText("Active · unavailable", { exact: true })).toBeVisible();
+    const originalLink = (await fixture.userClient.rpc("get_event_share_link_management_state", {
+      p_guild_id: fixture.guildId, p_event_id: fixture.eventId,
+    })).data?.[0].link_id;
+    expect(typeof originalLink).toBe("string");
     await dialog.getByRole("button", { name: "Copy Link", exact: true }).click();
     const manual = dialog.getByLabel("Temporary development link");
     await expect(manual).toBeVisible(); await expect(manual).toBeFocused();
@@ -84,17 +88,26 @@ test("Owner manages authenticated link lifecycle with manual copy and responsive
     expect(publishError).toBeNull();
     await page.getByRole("button", { name: "Share Link", exact: true }).click();
     await expect(dialog.getByText("Active · published", { exact: true })).toBeVisible();
-    expect((await fixture.anonymousClient.rpc("resolve_event_share_link", { p_token: bearer })).data?.length).toBe(1);
+    expect((await fixture.anonymousClient.rpc("resolve_event_share_link", { p_token: bearer })).error?.code).toBe("42501");
     await dialog.getByRole("button", { name: "Rotate Link", exact: true }).click();
     const confirm = page.getByRole("dialog", { name: "Rotate share link?" });
     await expect(confirm.getByRole("button", { name: "Cancel", exact: true })).toBeFocused();
     await page.keyboard.press("Escape"); await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Rotate Link", exact: true })).toBeFocused();
-    expect((await fixture.anonymousClient.rpc("resolve_event_share_link", { p_token: bearer })).data?.length).toBe(1);
+    expect((await fixture.userClient.rpc("resolve_event_share_link", { p_token: bearer })).error?.code).toBe("42501");
+    expect((await fixture.userClient.rpc("get_event_share_link_management_state", {
+      p_guild_id: fixture.guildId, p_event_id: fixture.eventId,
+    })).data?.[0].link_id).toBe(originalLink);
     await dialog.getByRole("button", { name: "Rotate Link", exact: true }).click();
     await confirm.getByRole("button", { name: "Rotate Link now" }).click();
     await expect(dialog.getByText("Link rotated. Older links are invalid.")).toBeVisible();
-    expect((await fixture.anonymousClient.rpc("resolve_event_share_link", { p_token: bearer })).data?.length).toBe(0);
+    // Positive/rotated token resolution is covered with the internal role in SQL and crypto integration.
+    expect((await fixture.anonymousClient.rpc("resolve_event_share_link", { p_token: bearer })).error?.code).toBe("42501");
+    const obsoleteCopy = await fixture.userClient.rpc("get_event_share_link_copy_payload", {
+      p_guild_id: fixture.guildId, p_event_id: fixture.eventId, p_link_id: originalLink!,
+    });
+    expect(obsoleteCopy.error).toBeNull();
+    expect(obsoleteCopy.data?.length).toBe(0);
     await dialog.getByRole("button", { name: "Revoke Link", exact: true }).click();
     await page.getByRole("dialog", { name: "Revoke share link?" }).getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(dialog.getByRole("button", { name: "Revoke Link", exact: true })).toBeFocused();
@@ -127,6 +140,8 @@ for (const actor of ["admin", "publisher", "events-only", "member"] as const) {
       cleanupActor = created.cleanup;
       await actorContext.grantPermissions(["clipboard-read", "clipboard-write"]);
       const allowed = actor === "admin" || actor === "publisher";
+      const resolver = await created.userClient.rpc("resolve_event_share_link", { p_token: "malformed" });
+      expect(resolver.error?.code).toBe("42501");
       const postgrest = await created.userClient.rpc("get_event_share_link_management_state", { p_guild_id: fixture.guildId, p_event_id: fixture.eventId });
       expect(postgrest.error?.code ?? null).toBe(allowed ? null : "42501");
       const replay = await actorContext.request.post(original.url(), { data: original.postData()!, headers: {

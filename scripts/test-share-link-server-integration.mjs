@@ -1,5 +1,5 @@
 // Invoked only inside the guarded, ownership-verified disposable DB workflow.
-// Runs production TypeScript crypto against the actual authenticated/anon SQL roles.
+// Runs production TypeScript crypto against the actual authenticated/internal resolver SQL roles.
 import { randomBytes } from "node:crypto";
 
 export function testShareLinkServerIntegration({ modules, key, sql, database }) {
@@ -60,7 +60,7 @@ insert into public.event_slots(id,guild_id,event_id,party_id,name,sort_order) va
   statements.push(`select is((select link_id::text from public.get_event_share_link_state('${guildId}','${eventId}')),'${first.identity.linkId}','state retrieves generated identity');`);
   statements.push(`select 'INTEGRATION_COPY:'||row_to_json(p)::text from public.get_event_share_link_copy_payload('${guildId}','${eventId}','${first.identity.linkId}') p;`);
   statements.push(`select lives_ok(${literal(call(first))},'exact production proof replay is idempotent while active');`);
-  statements.push(`set local role anon; select is((select count(*) from public.resolve_event_share_link('${first.token}')),1::bigint,'anonymous resolver accepts real canonical AES token');`);
+  statements.push(`set local role go_event_share_resolver; select is((select count(*) from public.resolve_event_share_link('${first.token}')),1::bigint,'internal resolver accepts real canonical AES token');`);
   actor(2);
   deny(call(second,{ previousLinkId: id("80",99) }), "rotation proof binds previous identity");
   deny(call({ ...second, proof: first.proof }), "create proof cannot authorize rotate");
@@ -72,7 +72,7 @@ insert into public.event_slots(id,guild_id,event_id,party_id,name,sort_order) va
   statements.push(`select lives_ok(${literal(`select public.revoke_event_share_link('${guildId}','${eventId}','${first.identity.linkId}')`)},'stale revoke targets old identity only');`);
   statements.push(`select is((select link_id::text from public.get_event_share_link_state('${guildId}','${eventId}')),'${third.identity.linkId}','stale revoke preserves current identity');`);
   statements.push(`select lives_ok(${literal(`select public.revoke_event_share_link('${guildId}','${eventId}','${third.identity.linkId}')`)},'authorized Officer permanently revokes current link');`);
-  statements.push(`set local role anon; select is((select count(*) from public.resolve_event_share_link('${third.token}')),0::bigint,'revoked real token unavailable'); select * from finish(); rollback;`);
+  statements.push(`set local role go_event_share_resolver; select is((select count(*) from public.resolve_event_share_link('${third.token}')),0::bigint,'revoked real token unavailable'); select * from finish(); rollback;`);
   const output = sql(database, statements.join("\n"), "supabase_admin", true);
   if (output === null) throw new Error("Server integration SQL execution failed (sensitive details suppressed)");
   const copy = output.split(/\r?\n/).find((line) => line.startsWith("INTEGRATION_COPY:"));

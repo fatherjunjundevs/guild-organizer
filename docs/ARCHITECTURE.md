@@ -262,6 +262,20 @@ A single landing-page smoke test is not enough for release.
 
 ## CI Quality
 
+### Phase 6.3A.5C.1 resolver database access boundary
+
+The additive `20261010002444_event_share_link_resolver_access_boundary.sql` migration supersedes the earlier anonymous/authenticated resolver grants. It preserves `public.resolve_event_share_link(text)` byte-for-byte (including its owner, STABLE definer boundary, empty search path, signature and four-field current sealed-publication projection). PUBLIC, anon, authenticated and service_role lose EXECUTE. Management, cryptography, snapshots and the local-only organizer gate remain unchanged.
+
+`go_event_share_resolver` receives public schema USAGE and resolver EXECUTE only. It is NOLOGIN, NOINHERIT, NOBYPASSRLS, NOSUPERUSER, NOCREATEDB, NOCREATEROLE and NOREPLICATION. No application/Data API role receives membership, and the resolver role inherits no role. PostgreSQL can automatically grant a non-superuser creator an ADMIN membership; the verified local creator grant is to postgres, from supabase_admin, with INHERIT/SET disabled. That trusted administrative membership is not an application access path.
+
+Roles are cluster-wide. The migration rejects **every** existing role-name collision, including apparently compatible roles, and performs creation/revocation/grants in one transaction. Migration history prevents ordinary replay; manual replay is deliberately rejected. A different database in the same cluster must not silently adopt the role. Independent ownership review or a separate isolated cluster is required when a genuine deployed role already exists.
+
+Least privilege is scoped to application access, not a claim that PUBLIC grants disappear. Disposable catalog tests report inherited CONNECT/TEMP, and PUBLIC EXECUTE on `private.set_updated_at` and `private.prevent_membership_identity_change` without private schema USAGE. Built-in/extension functions can also retain PUBLIC privileges. Tests check effective callable application functions, protected table/column permissions, schema creation and role escalation. Future operational provisioning must re-audit ambient privileges and default grants in the actual target.
+
+Public resolution remains unavailable after this migration: there is no replacement route, public page, adapter, credential provisioning or limiter. The planned adapter uses a dedicated server-only database connection and a parameterized resolver query, not a Supabase service-role key or user-cookie client. Provisioning, TLS/pooling, trusted proxy handling, distributed fail-closed admission, token-safe observability and public response protections require later approval. See [configuration and rollout precautions](SHARE_LINK_SERVER_CONFIGURATION.md#internal-resolver-boundary-phase-63a5c1).
+
+`pnpm db:test:concurrency` now runs all SQL regressions in its verified, empty, ownership-marked disposable database before the existing real-session suites and production-crypto integration. It durably records exact resolver-role creation intent, OID and run marker outside Git. The disposable runner alone enables SET for the trusted creator and supplies pgTAP schema USAGE; these are test-only and are removed with the owned role/database. Cleanup refuses changed role attributes, untrusted memberships or surviving cluster dependencies. A crash before ownership confirmation requires review, not adoption. Development migrations and historical fixtures are not touched. Evidence and outstanding HTTP/browser gates are in [the checkpoint validation report](reviews/PHASE_6_3A_5C_1_VALIDATION.md).
+
 Continue automated lint, tests, build, E2E, clean DB reset, DB lint/tests, and generated DB type verification.
 
 ## Security Hardening Before Preview/Public Release
