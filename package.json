@@ -19,6 +19,8 @@
     "db:lint": "supabase db lint",
     "db:test": "supabase test db",
     "db:test:concurrency": "node scripts/test-share-link-concurrency.mjs",
+    "db:test:isolation": "node scripts/test-isolated-postgres-lifecycle.mjs",
+    "db:test:recover": "node scripts/isolated-postgres-test-cluster.mjs recover",
     "db:types": "node scripts/generate-database-types.mjs",
     "db:types:check": "node scripts/generate-database-types.mjs --check",
     "test:e2e:cleanup": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/test-local-fixture-cleanup.mjs",
