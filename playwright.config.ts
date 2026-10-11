@@ -5,6 +5,9 @@ const local = verifiedLocalEnvironment();
 
 export default defineConfig({
   testDir: "./e2e",
+  // These security/header tests run separately against the local production
+  // build; Next dev overwrites page Cache-Control with no-cache.
+  testIgnore: "public-event-viewer.spec.ts",
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

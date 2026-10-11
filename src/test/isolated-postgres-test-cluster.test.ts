@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
@@ -74,12 +74,25 @@ function fakeDocker() {
 async function inPrivateUnitDirectory(test: () => Promise<void>) {
   const directory = mkdtempSync(join(tmpdir(), "go-image-identity-unit-"));
   mocks.home = directory; vi.stubEnv("LOCALAPPDATA", directory);
-  try { await test(); }
+  try {
+    mkdirSync(join(directory, ".local", "state"), { recursive: true, mode: 0o700 });
+    await test();
+  }
   finally { mocks.home = null; rmSync(directory, { recursive: true }); }
 }
 const removals = () => mocks.spawnSync.mock.calls.filter(([binary, args]) => binary === "docker" && args[0] === "rm");
 
 describe("pinned PostgreSQL repository and local image identities", () => {
+  it("provides the complete private Linux manifest fixture path before cluster creation", async () => {
+    await inPrivateUnitDirectory(async () => {
+      for (const path of [join(mocks.home!, ".local"), join(mocks.home!, ".local", "state")]) {
+        const stat = lstatSync(path); expect(stat.isDirectory()).toBe(true);
+        if (process.platform !== "win32") {
+          expect(stat.mode & 0o077).toBe(0); expect(stat.uid).toBe(process.getuid!());
+        }
+      }
+    });
+  });
   it.each(["amd64", "x86_64"])("accepts distinct digests on an %s daemon", architecture => {
     expect(verifyPinnedPostgresImage(approvedImage, { ...daemon, Architecture: architecture })).toBe(imageId);
     expect(imageId).not.toBe(imageDigest.split("@")[1]);
