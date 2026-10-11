@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { assertInactive, createIsolatedCluster, imageDigest, localTarget, ownershipLabels, persistManifest,
   readManifest, recoverIsolatedCluster, repositoryRoot, safeError, verifyContainer, verifyManifest,
-  verifyManifestDestination, verifyPinnedPostgresImage, verifyTarget } from "../../scripts/isolated-postgres-test-cluster.mjs";
+  startupError, verifyManifestDestination, verifyPinnedPostgresImage, verifyTarget } from "../../scripts/isolated-postgres-test-cluster.mjs";
 import { postgresStartupCommand, httpStartupSettings } from "../../scripts/isolated-postgres-test-cluster.mjs";
 
 const mocks = vi.hoisted(() => ({ spawnSync: vi.fn(), home: null as string | null }));
@@ -35,20 +35,34 @@ afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 const approvedImage = { id: imageId, digests: [imageDigest], os: "linux", architecture: "amd64" };
 const daemon = { ID: target.daemonId, OSType: "linux", Architecture: "x86_64" };
+const startupStages = ["container-start", "postgres-readiness", "bootstrap-sql", "postgres-password",
+  "hba-configuration", "hba-verification", "scram-probe", "test-database-create", "database-identity"];
+const privateOutput = "synthetic-password postgres://synthetic:credential@host v1.synthetic-token SELECT private_value;";
 
 // Every Docker/ACL subprocess is mocked. Real filesystem evidence and leases are
 // confined to this test's temporary directory; no daemon or database is contacted.
 function fakeDocker() {
   const state = { image: structuredClone(approvedImage), daemon: { ...daemon },
     container: null as (Omit<typeof container, "labels"> & { labels: Record<string, string> }) | null,
-    imageAvailable: true, onCreate: null as (() => void) | null };
-  mocks.spawnSync.mockImplementation((binary: string, args: string[]) => {
+    imageAvailable: true, onCreate: null as (() => void) | null,
+    context: target.context, endpoint: target.endpoint, startupOrder: [] as string[], tcpAttempts: 0,
+    failureStage: null as string | null, failureKind: "status", hba: "0\n1", rejectValidPassword: false,
+    acceptWrongPassword: false, badIdentity: false };
+  mocks.spawnSync.mockImplementation((binary: string, args: string[], options?: { input?: string }) => {
     const ok = (stdout: string) => ({ status: 0, stdout, stderr: "" });
+    const startup = (stage: string, stdout = "") => {
+      state.startupOrder.push(stage);
+      if (state.failureStage === stage) {
+        if (state.failureKind === "exception") throw Object.assign(new Error(privateOutput), { safe: true });
+        return { status: 1, stdout: privateOutput, stderr: state.failureKind === "sqlstate" ? "ERROR: 42501: " + privateOutput : privateOutput };
+      }
+      return ok(stdout);
+    };
     if (binary === "whoami") return ok('"user","S-1-5-21-1000"');
     if (binary === "icacls") return ok("");
     if (binary === "powershell") return ok(JSON.stringify({ owner: "S-1-5-21-1000", protected: true, allow: ["S-1-5-21-1000"] }));
     if (binary !== "docker") throw new Error("Unexpected subprocess");
-    if (args[0] === "context") return ok(args[1] === "show" ? target.context : target.endpoint);
+    if (args[0] === "context") return ok(args[1] === "show" ? state.context : state.endpoint);
     if (args[0] === "info") return ok(JSON.stringify(state.daemon));
     if (args[0] === "image" && args[1] === "inspect") {
       expect(args[2]).toBe(imageDigest);
@@ -64,6 +78,33 @@ function fakeDocker() {
       state.container = created; state.onCreate?.(); return ok(created.id!);
     }
     if (args[0] === "inspect") return state.container ? ok(JSON.stringify(state.container)) : { status: 1, stdout: "", stderr: "absent" };
+    if (args[0] === "start") {
+      const result = startup("container-start");
+      if (result.status === 0) state.container!.state = "running";
+      return result;
+    }
+    if (args[0] === "exec") {
+      const input = options?.input ?? "";
+      if (args.includes("pg_isready") || input.startsWith("select to_regclass(")) return startup("postgres-readiness", "t");
+      if (input.startsWith("-- TEST BOOTSTRAP ONLY")) return startup("bootstrap-sql");
+      if (input.includes("alter role postgres password")) return startup("postgres-password");
+      if (args.includes("cat > /etc/postgresql/pg_hba.conf") || input === "select pg_reload_conf();") return startup("hba-configuration", "t");
+      if (input.includes("pg_hba_file_rules")) return startup("hba-verification", state.hba);
+      if (args.some(arg => arg.startsWith("IFS= read -r PGPASSWORD"))) {
+        const result = startup("scram-probe", "postgres"); state.tcpAttempts++;
+        if (result.status !== 0) return result;
+        const rejected = state.tcpAttempts === 1 ? !state.acceptWrongPassword : state.rejectValidPassword;
+        return rejected ? { status: 1, stdout: "", stderr: privateOutput } : result;
+      }
+      if (input.startsWith("create database ")) return startup("test-database-create");
+      if (input.includes("pg_control_system()")) {
+        if (state.badIdentity) return startup("database-identity", privateOutput);
+        const identity = { systemId: "1000001", databaseOid: "17001" };
+        return startup("database-identity", JSON.stringify(input.includes("'owner'") ? {
+          ...identity, owner: "postgres", marker: `go-disposable:${state.container!.labels["go.test.run"]}`,
+        } : identity));
+      }
+    }
     if (args[0] === "rm") {
       expect(args).toEqual(["rm", "--force", state.container?.id]); state.container = null; return ok("");
     }
@@ -81,6 +122,111 @@ async function inPrivateUnitDirectory(test: () => Promise<void>) {
   finally { mocks.home = null; rmSync(directory, { recursive: true }); }
 }
 const removals = () => mocks.spawnSync.mock.calls.filter(([binary, args]) => binary === "docker" && args[0] === "rm");
+
+describe("bounded PostgreSQL startup diagnostics", () => {
+  it.each(startupStages)("identifies a failing %s operation and preserves exact cleanup", async stage => {
+    const state = fakeDocker(); const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster(); state.failureStage = stage;
+      // Readiness still retries; only the test clock advances past its unchanged deadline.
+      if (stage === "postgres-readiness") vi.spyOn(Date, "now").mockReturnValueOnce(0).mockReturnValue(120001);
+      try {
+        try { await cluster.start(); throw new Error("Expected startup failure"); }
+        catch (error) {
+          const message = safeError(error);
+          expect(message).toBe(`Isolated PostgreSQL startup failed at ${stage} (details suppressed)`);
+          expect(message.includes(privateOutput)).toBe(false); expect(Object.hasOwn(error!, "cause")).toBe(false);
+          console.error(message);
+        }
+      } finally { state.failureStage = null; await cluster.cleanup(); }
+      expect(logged).toHaveBeenCalledWith(`Isolated PostgreSQL startup failed at ${stage} (details suppressed)`);
+      expect(cluster.record.phase).toBe("removed"); expect(removals()).toHaveLength(1);
+      expect(removals()[0][1]).toEqual(["rm", "--force", cluster.record.containerId]);
+    });
+  });
+  it.each(["Windows", "Linux"])("preserves startup order, assertions and ready identity with %s target conventions", async platform => {
+    const state = fakeDocker(); const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    if (platform === "Linux") { state.context = "default"; state.endpoint = "unix:///var/run/docker.sock"; }
+    else state.hba = "0\r\n1";
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster();
+      try {
+        expect(await cluster.start()).toBe(cluster);
+        expect(state.startupOrder).toEqual(["container-start", "postgres-readiness", "postgres-readiness", "bootstrap-sql",
+          "postgres-password", "hba-configuration", "hba-configuration", "hba-verification", "scram-probe", "scram-probe",
+          "test-database-create", "database-identity"]);
+        expect(readManifest(cluster.path).phase).toBe("ready");
+        expect(cluster.record.identity).toEqual({ systemId: "1000001", databaseOid: "17001" });
+        expect(state.tcpAttempts).toBe(2); expect(logged).not.toHaveBeenCalled();
+      } finally { await cluster.cleanup(); }
+      expect(removals()).toHaveLength(1);
+    });
+  });
+  it("sanitizes an arbitrary supposedly-safe exception from Docker execution", async () => {
+    const state = fakeDocker(); state.failureKind = "exception";
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster(); state.failureStage = "bootstrap-sql";
+      try { await expect(cluster.start()).rejects.toThrow(/^Isolated PostgreSQL startup failed at bootstrap-sql \(details suppressed\)$/); }
+      finally { state.failureStage = null; await cluster.cleanup(); }
+    });
+  });
+  it("preserves a SQLSTATE from the actual Docker classifier without exposing stderr", async () => {
+    const state = fakeDocker(); state.failureKind = "sqlstate";
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster(); state.failureStage = "bootstrap-sql";
+      try { await expect(cluster.start()).rejects.toThrow(/^Isolated PostgreSQL startup failed at bootstrap-sql \(SQLSTATE 42501\) \(details suppressed\)$/); }
+      finally { state.failureStage = null; await cluster.cleanup(); }
+    });
+  });
+  it("sanitizes malformed identity stdout instead of exposing JSON parser details", async () => {
+    const state = fakeDocker(); state.badIdentity = true;
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster();
+      try { await expect(cluster.start()).rejects.toThrow(/^Isolated PostgreSQL startup failed at database-identity \(details suppressed\)$/); }
+      finally { state.badIdentity = false; await cluster.cleanup(); }
+    });
+  });
+  it.each(["42501", "42601", "22023", "42883", "42703", "P0001", "58P01"])("preserves an existing safely classified SQLSTATE %s", code => {
+    const prior = Object.assign(new Error(`Isolated Docker exec failed (SQLSTATE ${code}) (details suppressed)`), { safe: true });
+    expect(safeError(startupError("bootstrap-sql", prior))).toBe(`Isolated PostgreSQL startup failed at bootstrap-sql (SQLSTATE ${code}) (details suppressed)`);
+  });
+  it.each([undefined, null, privateOutput, new Error(privateOutput),
+    Object.assign(new Error(`ERROR: 42501: ${privateOutput}`), { safe: true }),
+    Object.assign(new Error("Isolated Docker exec failed (SQLSTATE 99999) (details suppressed)"), { safe: true }),
+    { get safe() { throw new Error(privateOutput); } },
+  ])("sanitizes untrusted exception metadata without reading raw stderr", error => {
+    expect(safeError(startupError("database-identity", error))).toBe("Isolated PostgreSQL startup failed at database-identity (details suppressed)");
+  });
+  it.each(["unknown-stage", "bootstrap-sql\n" + privateOutput, undefined, null, { toString: () => privateOutput }])(
+    "never emits an unregistered startup stage", stage => {
+      expect(safeError(startupError(stage, new Error(privateOutput)))).toBe("Isolated PostgreSQL startup failed (details suppressed)");
+    });
+  it.each(["wrong-password-accepted", "valid-password-rejected", "invalid-hba"])("keeps the %s assertion fail-closed", async fault => {
+    const state = fakeDocker();
+    state.acceptWrongPassword = fault === "wrong-password-accepted"; state.rejectValidPassword = fault === "valid-password-rejected";
+    if (fault === "invalid-hba") state.hba = "unsafe";
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster();
+      try { await expect(cluster.start()).rejects.toThrow(`Isolated PostgreSQL startup failed at ${fault === "invalid-hba" ? "hba-verification" : "scram-probe"} (details suppressed)`); }
+      finally { await cluster.cleanup(); }
+      expect(removals()).toHaveLength(1);
+    });
+  });
+  it.each(["imageId", "daemonId", "containerId"])("refuses startup and cleanup after %s changes", async field => {
+    const state = fakeDocker();
+    await inPrivateUnitDirectory(async () => {
+      const cluster = await createIsolatedCluster(); const original = structuredClone(state.container);
+      try {
+        if (field === "imageId") state.image.id = "sha256:" + "e".repeat(64);
+        if (field === "daemonId") state.daemon.ID = "other-daemon";
+        if (field === "containerId") state.container!.id = "c".repeat(64);
+        await expect(cluster.start()).rejects.toThrow("Isolated PostgreSQL startup failed at container-start (details suppressed)");
+        await expect(cluster.cleanup()).rejects.toThrow(); expect(removals()).toHaveLength(0);
+        expect(state.startupOrder).toEqual([]);
+      } finally { state.image = structuredClone(approvedImage); state.daemon = { ...daemon }; state.container = original; await cluster.cleanup(); }
+    });
+  });
+});
 
 describe("pinned PostgreSQL repository and local image identities", () => {
   it("provides the complete private Linux manifest fixture path before cluster creation", async () => {

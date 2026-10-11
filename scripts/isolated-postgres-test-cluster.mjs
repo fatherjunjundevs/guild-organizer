@@ -31,6 +31,22 @@ export const repositoryRoot = realpathSync(resolve(import.meta.dirname, ".."));
 const repoId = createHash("sha256").update(repositoryRoot).digest("hex");
 const stages = ["planned", "submitted", "created", "starting", "started", "ready", "removing", "removed"];
 const sensitiveLogging = "set log_statement='none'; set log_min_error_statement='panic'; set log_parameter_max_length=0; set log_parameter_max_length_on_error=0;\n";
+const startupStages = Object.freeze(["container-start", "postgres-readiness", "bootstrap-sql", "postgres-password",
+  "hba-configuration", "hba-verification", "scram-probe", "test-database-create", "database-identity"]);
+export function startupError(stage, error) {
+  const label = startupStages.includes(stage) ? ` at ${stage}` : "";
+  let state = "";
+  try {
+    // Preserve only SQLSTATEs already emitted by the existing Docker classifier.
+    // Never forward even a supposedly safe exception's arbitrary message/cause.
+    const match = error?.safe === true && typeof error.message === "string"
+      ? error.message.match(/^Isolated Docker (?:exec|start) failed \(SQLSTATE (42501|42601|22023|42883|42703|P0001|58P01)\) \(details suppressed\)$/) : null;
+    if (match) state = ` (SQLSTATE ${match[1]})`;
+  } catch { /* Untrusted exception metadata is not diagnostic evidence. */ }
+  const sanitized = new Error(`Isolated PostgreSQL startup failed${label}${state} (details suppressed)`);
+  sanitized.safe = true;
+  return sanitized;
+}
 export const literal = value => "'" + String(value).replaceAll("'", "''") + "'";
 export function safeError(error) {
   // Never return raw Docker/psql stderr: it can echo SQL, credentials or tokens.
@@ -274,39 +290,50 @@ export class IsolatedCluster {
     return docker(["exec", "-i", this.record.containerId, "pg_dump", "-U", "postgres", "-d", "postgres", "--schema-only", "--schema=auth", "--no-owner", "--no-privileges"]);
   }
   async start() {
-    this.verify(); this.update({ phase: "starting" });
-    docker(["start", this.record.containerId]); this.update({ phase: "started" });
-    const deadline = Date.now() + 120_000;
-    while (true) {
-      this.verify();
-      if (docker(["exec", this.record.containerId, "pg_isready", "-U", "supabase_admin", "-d", "postgres"], undefined, true, 5000) !== null) {
-        const ready = this.rawSql("postgres", "select to_regclass('auth.users') is not null and exists(select 1 from pg_roles where rolname='postgres' and not rolsuper);", "supabase_admin", true);
-        if (ready?.trim() === "t") break;
+    let stage = "container-start";
+    try {
+      this.verify(); this.update({ phase: "starting" });
+      docker(["start", this.record.containerId]); this.update({ phase: "started" });
+      stage = "postgres-readiness";
+      const deadline = Date.now() + 120_000;
+      while (true) {
+        this.verify();
+        if (docker(["exec", this.record.containerId, "pg_isready", "-U", "supabase_admin", "-d", "postgres"], undefined, true, 5000) !== null) {
+          const ready = this.rawSql("postgres", "select to_regclass('auth.users') is not null and exists(select 1 from pg_roles where rolname='postgres' and not rolsuper);", "supabase_admin", true);
+          if (ready?.trim() === "t") break;
+        }
+        if (Date.now() > deadline) fail("Isolated PostgreSQL bootstrap readiness timed out");
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
-      if (Date.now() > deadline) fail("Isolated PostgreSQL bootstrap readiness timed out");
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-    this.rawSql("postgres", readFileSync(new URL("./sql/isolated-postgres-test-bootstrap.sql", import.meta.url), "utf8"));
-    this.password = randomBytes(32).toString("hex");
-    this.rawSql("postgres", sensitiveLogging + `set password_encryption='scram-sha-256'; alter role postgres password ${literal(this.password)};`);
-    // Bootstrap trust is restricted by network=none. Replace final TCP HBA with
-    // SCRAM before any dblink sessions; Unix sockets remain trusted for docker exec.
-    this.verify();
-    docker(["exec", "-i", this.record.containerId, "sh", "-c", "cat > /etc/postgresql/pg_hba.conf"],
-      "local all all trust\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::/0 reject\n");
-    this.rawSql("postgres", "select pg_reload_conf();");
-    const hba = this.rawSql("postgres", "select count(*) from pg_hba_file_rules where error is not null or (type='host' and auth_method not in ('scram-sha-256','reject')); select count(*) from pg_hba_file_rules where type='host' and address='127.0.0.1' and auth_method='scram-sha-256';").trim();
-    if (hba !== "0\n1" && hba !== "0\r\n1") fail("Password-authenticated loopback configuration verification failed");
-    // Real password login, both denial and acceptance, without CLI/env secrets.
-    this.verify();
-    const tcp = pass => docker(["exec", "-i", this.record.containerId, "sh", "-c", "IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -X -qAt -w -h 127.0.0.1 -U postgres -d postgres -c 'select current_user'"], pass + "\n", true);
-    const wrongPassword=randomBytes(32).toString("hex");
-    this.privacySecrets.push(this.password,wrongPassword);
-    if (tcp(wrongPassword) !== null || tcp(this.password)?.trim() !== "postgres") fail("Real SCRAM authentication probe failed");
-    this.rawSql("postgres", `create database ${this.record.database} template template0 owner postgres; comment on database ${this.record.database} is ${literal(this.record.marker)};`);
-    const identity = JSON.parse(this.rawSql("postgres", `select json_build_object('systemId',(pg_control_system()).system_identifier::text,'databaseOid',(select oid::text from pg_database where datname=${literal(this.record.database)}));`));
-    this.update({ phase: "ready", identity });
-    return this;
+      stage = "bootstrap-sql";
+      this.rawSql("postgres", readFileSync(new URL("./sql/isolated-postgres-test-bootstrap.sql", import.meta.url), "utf8"));
+      stage = "postgres-password";
+      this.password = randomBytes(32).toString("hex");
+      this.rawSql("postgres", sensitiveLogging + `set password_encryption='scram-sha-256'; alter role postgres password ${literal(this.password)};`);
+      // Bootstrap trust is restricted by network=none. Replace final TCP HBA with
+      // SCRAM before any dblink sessions; Unix sockets remain trusted for docker exec.
+      stage = "hba-configuration";
+      this.verify();
+      docker(["exec", "-i", this.record.containerId, "sh", "-c", "cat > /etc/postgresql/pg_hba.conf"],
+        "local all all trust\nhost all all 127.0.0.1/32 scram-sha-256\nhost all all 0.0.0.0/0 reject\nhost all all ::/0 reject\n");
+      this.rawSql("postgres", "select pg_reload_conf();");
+      stage = "hba-verification";
+      const hba = this.rawSql("postgres", "select count(*) from pg_hba_file_rules where error is not null or (type='host' and auth_method not in ('scram-sha-256','reject')); select count(*) from pg_hba_file_rules where type='host' and address='127.0.0.1' and auth_method='scram-sha-256';").trim();
+      if (hba !== "0\n1" && hba !== "0\r\n1") fail("Password-authenticated loopback configuration verification failed");
+      // Real password login, both denial and acceptance, without CLI/env secrets.
+      stage = "scram-probe";
+      this.verify();
+      const tcp = pass => docker(["exec", "-i", this.record.containerId, "sh", "-c", "IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -X -qAt -w -h 127.0.0.1 -U postgres -d postgres -c 'select current_user'"], pass + "\n", true);
+      const wrongPassword=randomBytes(32).toString("hex");
+      this.privacySecrets.push(this.password,wrongPassword);
+      if (tcp(wrongPassword) !== null || tcp(this.password)?.trim() !== "postgres") fail("Real SCRAM authentication probe failed");
+      stage = "test-database-create";
+      this.rawSql("postgres", `create database ${this.record.database} template template0 owner postgres; comment on database ${this.record.database} is ${literal(this.record.marker)};`);
+      stage = "database-identity";
+      const identity = JSON.parse(this.rawSql("postgres", `select json_build_object('systemId',(pg_control_system()).system_identifier::text,'databaseOid',(select oid::text from pg_database where datname=${literal(this.record.database)}));`));
+      this.update({ phase: "ready", identity });
+      return this;
+    } catch (error) { throw startupError(stage, error); }
   }
   reconcileCreation() {
     if (this.record.containerId) return;
