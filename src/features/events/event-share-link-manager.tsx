@@ -137,7 +137,7 @@ function ShareLinkSession({ guildId, eventId, eventName, archived = false, disab
       try {
         if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
         await navigator.clipboard.writeText(result.url);
-        if (valid(ticket)) setMessage("Development link copied. The public Event page is not available yet.");
+        if (valid(ticket)) setMessage("Development link copied. The member viewer requires approved local configuration; hosted sharing remains disabled.");
       } catch {
         if (valid(ticket)) { setManualUrl(result.url); setMessage("Clipboard unavailable. Select and copy the temporary field below."); }
       }
@@ -192,7 +192,7 @@ function ShareLinkSession({ guildId, eventId, eventName, archived = false, disab
               <Button type="button" variant="danger" disabled={blocked} onClick={() => startTransition(() => { void mutate(confirmation); })}>{confirmation === "rotate" ? "Rotate Link now" : "Revoke Link now"}</Button>
             </div>
           </> : <>
-            <p id={`${id}-description`} className="text-sm leading-6 text-[var(--text-secondary)]">Development only: the public Event page is not implemented. Copied links are not ready to send to members.</p>
+            <p id={`${id}-description`} className="text-sm leading-6 text-[var(--text-secondary)]">Development only: copied links open the member viewer when its local security prerequisites are configured. Hosted sharing remains disabled pending review. Do not send development links to members.</p>
             <Surface level={2} className="mt-4 p-4" aria-busy={busy}>
               <StatusChip tone={state?.state === "active" && state.available ? "success" : "neutral"}>{label}</StatusChip>
               <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{detail}</p>

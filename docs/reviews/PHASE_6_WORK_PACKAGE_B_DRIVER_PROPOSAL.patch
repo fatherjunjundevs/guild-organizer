@@ -1,0 +1,56 @@
+diff --git a/src/features/events/public-event-postgres.ts b/src/features/events/public-event-postgres.ts
+new file mode 100644
+--- /dev/null
++++ b/src/features/events/public-event-postgres.ts
+@@ -0,0 +1,18 @@
++import "server-only";
++import { Pool } from "pg";
++import { publicPoolOptions, type PublicEventConfig } from "./public-event-config";
++import { createPublicResolver } from "./public-event-resolver";
++
++export function publicPostgresResolver(config: PublicEventConfig) {
++  const pool = new Pool(publicPoolOptions(config));
++  // pg removes the failed idle backend. Never forward its raw error to logs.
++  pool.on("error", () => {});
++  return createPublicResolver({
++    async connect() {
++      const client = await pool.connect();
++      return {
++        query: (sql, values) => client.query(sql, values ? Array.from(values) : undefined),
++        release: destroy => client.release(destroy),
++      };
++    },
++  });
++}
+diff --git a/src/app/api/share/event/route.ts b/src/app/api/share/event/route.ts
+new file mode 100644
+--- /dev/null
++++ b/src/app/api/share/event/route.ts
+@@ -0,0 +1,27 @@
++import "server-only";
++import { publicHandlerConfig, createPublicEventHandler } from "@/features/events/public-event-handler";
++import { admitPublicRequest } from "@/features/events/public-event-admission";
++import { publicPostgresResolver } from "@/features/events/public-event-postgres";
++
++export const runtime = "nodejs";
++export const dynamic = "force-dynamic";
++// Operator configuration changes require a process restart. No pool is created
++// until a validated, admitted POST reaches the database stage.
++const config = publicHandlerConfig();
++let resolve: ReturnType<typeof publicPostgresResolver> | undefined;
++const handler = createPublicEventHandler({
++  config: () => config,
++  admit: admitPublicRequest,
++  async resolve(input, current) {
++    if (!config || current !== config) throw new Error("Unavailable");
++    resolve ??= publicPostgresResolver(config);
++    return resolve(input, config);
++  },
++});
++export const POST = handler;
++export const GET = handler;
++export const HEAD = handler;
++export const PUT = handler;
++export const PATCH = handler;
++export const DELETE = handler;
++export const OPTIONS = handler;

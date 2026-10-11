@@ -1,7 +1,9 @@
-import type { NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/lib/supabase/proxy";
 
 export async function proxy(request: NextRequest) {
+  // Public sharing never consults auth cookies or refreshes a member session.
+  if (["/share/event", "/api/share/event"].includes(request.nextUrl.pathname)) return NextResponse.next();
   return updateSession(request);
 }
 
