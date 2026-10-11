@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash, createHmac } from "node:crypto";
-import { imageDigest, imageId, repositoryRoot, verifyManifest, verifyTarget } from "../../scripts/isolated-postgres-test-cluster.mjs";
+import { imageDigest, repositoryRoot, verifyManifest, verifyTarget } from "../../scripts/isolated-postgres-test-cluster.mjs";
 import { assertHttpResponse, assertNoSensitiveOutput, httpLabels, runtimeTmpfs, signTestJwt,
   verifyHttpContainer, verifyHttpPins, verifyHttpRecord } from "../../scripts/postgrest-http-contract.mjs";
 import { runtimeConfig, localRequest } from "../../scripts/docker/postgrest-http/harness.mjs";
@@ -21,7 +21,7 @@ import { cleanupHttpDependent, createHttpService, httpCreateArgs, httpSourceHash
 const pins={imageDigest:`test/go-http@sha256:${"1".repeat(64)}`,imageId:`sha256:${"2".repeat(64)}`,
   postgrestImage:`test/postgrest@sha256:${"3".repeat(64)}`,nodeImage:`test/node@sha256:${"4".repeat(64)}`,
   postgrestVersion:"14.6",postgrestSha256:"5".repeat(64),sourceSha256:httpSourceHash()};
-const target={context:"desktop-linux",endpoint:"npipe:////./pipe/dockerDesktopLinuxEngine",daemonId:"test-daemon",imageId,imageDigest};
+const target={context:"desktop-linux",endpoint:"npipe:////./pipe/dockerDesktopLinuxEngine",daemonId:"test-daemon",imageId:`sha256:${"d".repeat(64)}`,imageDigest};
 const parent={version:2,runId:"a".repeat(32),repoRoot:repositoryRoot,
   repoId:createHash("sha256").update(repositoryRoot).digest("hex"),target,
   containerName:`go-security-pg-${"a".repeat(32)}`,containerId:"b".repeat(64),intentAt:"2026-10-10T00:00:00.000Z",

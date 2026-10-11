@@ -11,7 +11,6 @@ import { pathToFileURL } from "node:url";
 import { verifyHttpRecord } from "./postgrest-http-contract.mjs";
 
 export const imageDigest = "public.ecr.aws/supabase/postgres@sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9";
-export const imageId = "sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9";
 // HTTP-only profile: retain the pinned image's required shared libraries, excluding
 // query auditing/explanation hooks. No change to development or SQL-only runs.
 export const httpSharedLibraries = "pg_stat_statements,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,pg_tle,plan_filter,supabase_vault";
@@ -75,7 +74,8 @@ export function verifyManifest(record) {
     || (record.containerId !== null && !/^[a-f0-9]{64}$/.test(record.containerId))
     || (record.createdAt !== null && !Number.isFinite(Date.parse(record.createdAt)))
     || !exactKeys(record.target, ["context", "endpoint", "daemonId", "imageId", "imageDigest"])
-    || !record.target.daemonId || record.target.imageId !== imageId || record.target.imageDigest !== imageDigest
+    || !record.target.daemonId || typeof record.target.imageId !== "string"
+    || !/^sha256:[a-f0-9]{64}$/.test(record.target.imageId) || record.target.imageDigest !== imageDigest
     || (record.identity !== null && (!exactKeys(record.identity, ["systemId", "databaseOid"])
       || !/^[0-9]+$/.test(record.identity.systemId) || !/^[0-9]+$/.test(record.identity.databaseOid)))) {
     fail("Invalid isolated-cluster ownership manifest; recovery refused");
@@ -102,7 +102,7 @@ export function verifyContainer(record, container) {
     || (record.containerId && container.id !== record.containerId)
     || (record.createdAt && container.created !== record.createdAt)
     || Date.parse(container.created) < Date.parse(record.intentAt) - 1000
-    || container.image !== imageId || container.configImage !== imageDigest
+    || container.image !== record.target.imageId || container.configImage !== imageDigest
     || !container.labels || Object.keys(container.labels).some(key => key.startsWith("com.supabase.cli."))
     || Object.entries(labels).some(([key, value]) => container.labels[key] !== value)
     || !host || host.NetworkMode !== "none" || host.Privileged || host.AutoRemove
@@ -137,6 +137,17 @@ function inspect(id) {
   }
   return JSON.parse(output);
 }
+export function verifyPinnedPostgresImage(image, daemon) {
+  // A registry index/manifest digest is not necessarily the daemon's image ID.
+  // Only the reviewed Linux/amd64 runner is supported, without emulation.
+  if (typeof image?.id !== "string" || !/^sha256:[a-f0-9]{64}$/.test(image.id)
+    || !Array.isArray(image.digests) || !image.digests.includes(imageDigest)
+    || image.os !== "linux" || image.architecture !== "amd64"
+    || daemon?.OSType !== "linux" || !["amd64", "x86_64"].includes(daemon.Architecture)) {
+    fail("Pinned PostgreSQL image is unavailable or incompatible; no fallback/pull attempted");
+  }
+  return image.id;
+}
 export function localTarget() {
   if (["DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH"].some(name => process.env[name])) {
     fail("Docker environment overrides are unsupported; no resources created");
@@ -149,10 +160,10 @@ export function localTarget() {
   const endpoint = docker(["context", "inspect", context, "--format", "{{.Endpoints.docker.Host}}"]).trim();
   if (!(endpoint === "npipe:////./pipe/dockerDesktopLinuxEngine" || endpoint === "unix:///var/run/docker.sock"
     || /^unix:\/\/\/[^\r\n]+\/\.docker\/desktop\/docker.sock$/.test(endpoint))) fail("Unsupported/nonlocal Docker endpoint");
-  const info = JSON.parse(docker(["info", "--format", '{"ID":{{json .ID}},"OSType":{{json .OSType}}}']));
+  const info = JSON.parse(docker(["info", "--format", '{"ID":{{json .ID}},"OSType":{{json .OSType}},"Architecture":{{json .Architecture}}}']));
   if (info.OSType !== "linux" || !info.ID) fail("A local Linux Docker environment is required");
-  const image = JSON.parse(docker(["image", "inspect", imageDigest, "--format", '{"id":{{json .Id}},"digests":{{json .RepoDigests}}}']));
-  if (image.id !== imageId || !image.digests.includes(imageDigest)) fail("Pinned PostgreSQL image is unavailable or incompatible; no fallback/pull attempted");
+  const image = JSON.parse(docker(["image", "inspect", imageDigest, "--format", '{"id":{{json .Id}},"digests":{{json .RepoDigests}},"os":{{json .Os}},"architecture":{{json .Architecture}}}']));
+  const imageId = verifyPinnedPostgresImage(image, info);
   return { context, endpoint, daemonId: info.ID, imageId, imageDigest };
 }
 export function verifyManifestDestination(base) {
@@ -374,6 +385,7 @@ export async function createIsolatedCluster({httpPrivacy=false}={}) {
       "--env", "POSTGRES_HOST_AUTH_METHOD=trust", "--env", "POSTGRES_PASSWORD=", imageDigest,
       ...postgresStartupCommand,
       ...(httpPrivacy ? httpStartupSettings.flatMap(s=>["-c",s]) : [])]);
+    verifyTarget(target, localTarget());
     const container = verifyContainer(record, inspect(id.trim()));
     cluster.update({ containerId: container.id, createdAt: container.created, phase: "created" });
     return cluster;
