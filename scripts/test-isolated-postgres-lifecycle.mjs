@@ -34,7 +34,7 @@ if (process.argv[2] === "--cleanup-failure-child") {
     // this suite runs. Their labels only exclude them from the non-test inventory
     // comparison; labels alone never authorize deletion. Our exact resources are
     // independently verified absent by each cleanup/recovery operation.
-    return result.stdout.trim().split(/\r?\n/).filter(line => line && !line.endsWith(" isolated-postgres-v1")).sort();
+    return result.stdout.trim().split(/\r?\n/).filter(line => line && !/ isolated-(postgres|postgrest)-v1$/.test(line)).sort();
   };
   const before = existing();
   let failed = false;

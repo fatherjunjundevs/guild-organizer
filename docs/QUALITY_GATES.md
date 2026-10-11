@@ -116,6 +116,8 @@ FUNCTIONAL / QUALITY-GATED COMPLETE
 
 ## Precise Status Language
 
+Phase 6.3A.5C.1C adds separate local `db:test:http` and `db:test:http:isolation` gates. They require reviewed immutable PostgREST binary/image provenance and real independently owned Docker runs, including exact-resource cleanup. Unknown provenance or an unavailable daemon is BLOCKED, never a runtime pass. Keep the existing 1,401 SQL, 16 lifecycle-concurrency, 130 authorization-concurrency and 31 production-cryptographic integration baselines; previous results do not substitute for rerunning changed infrastructure. HTTP 42501/status/header evidence, actual pool logging/identity controls and cache transitions must pass before local HTTP approval. Hosted gateway/browser validation and CI changes require their separate approvals. See [the checkpoint report](reviews/PHASE_6_3A_5C_1C_VALIDATION.md).
+
 Local authenticated E2E must first pass `pnpm test:e2e:cleanup`. Use the guarded automatic fixture lifecycle; do not ignore deletion errors or use service-role Guild DELETE. Before/after fixture verification, failed-teardown evidence and exact interrupted-run recovery are part of the gate. Historical leftovers are inventoried separately and are not evidence of a clean database. See [LOCAL_E2E_FIXTURES.md](LOCAL_E2E_FIXTURES.md).
 
 Do not casually describe the product as "secure", "performance is excellent", "production ready", or "finished" unless the relevant gate has actually been measured/audited.

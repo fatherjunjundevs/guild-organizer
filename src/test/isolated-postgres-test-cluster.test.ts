@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { createServer } from "node:net";
 import { assertInactive, imageDigest, imageId, localTarget, ownershipLabels, persistManifest,
   readManifest, repositoryRoot, safeError, verifyContainer, verifyManifest, verifyManifestDestination, verifyTarget } from "../../scripts/isolated-postgres-test-cluster.mjs";
+import { postgresStartupCommand, httpStartupSettings } from "../../scripts/isolated-postgres-test-cluster.mjs";
 
 const runId = "a".repeat(32);
 const target = { context: "desktop-linux", endpoint: "npipe:////./pipe/dockerDesktopLinuxEngine", daemonId: "owned-daemon", imageId, imageDigest };
@@ -22,6 +23,17 @@ const container = { id: record.containerId, name: `/${record.containerName}`, cr
     Tmpfs: { "/var/lib/postgresql/data": "rw,noexec,nosuid,nodev,size=1073741824" } } };
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 describe("isolated PostgreSQL ownership boundary", () => {
+  it("pins the complete HTTP-only startup command and rejects masking or extra hooks",()=>{
+    const r={...record,startupProfile:"http-private-v1"};
+    const cmd=[...postgresStartupCommand,...httpStartupSettings.flatMap(s=>["-c",s])];
+    const c={...container,cmd,env:[]};expect(verifyContainer(r,c)).toEqual(c);
+    for(const change of [{cmd:[...cmd,"-c","shared_preload_libraries=pgaudit"]},
+      {cmd:[...cmd,"-c","session_preload_libraries="]},{cmd:cmd.slice(0,-2)},
+      {env:["PGOPTIONS=-c log_statement=none"]},{cmd:[...cmd,"-c","log_statement=all"]}]) {
+      expect(()=>verifyContainer(r,{...c,...change})).toThrow(/startup profile/);
+    }
+    expect(()=>verifyManifest({...record,startupProfile:"unknown"})).toThrow();
+  });
   it("accepts an exact registered container, never requiring a development target", () => {
     expect(verifyManifest(record)).toEqual(record);
     expect(verifyContainer(record, container)).toEqual(container);

@@ -6,9 +6,16 @@ import { loadShareLinkTestModules } from "./load-share-link-test-modules.mjs";
 import { testShareLinkServerIntegration } from "./test-share-link-server-integration.mjs";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { prepareShareLinkTestDatabase } from "./share-link-test-database.mjs";
+import { assertHttpPrivacy } from "./http-postgres-privacy.mjs";
 
 process.chdir(repositoryRoot);
-const cluster = await createIsolatedCluster();
+const args=process.argv.slice(2);
+if(args.length>1 || (args.length===1 && args[0]!=="--http-privacy-profile")) {
+  console.error("Unsupported isolated concurrency arguments");process.exit(1);
+}
+const httpPrivacy=args.length===1;
+const cluster = await createIsolatedCluster({httpPrivacy});
 const { runId, database, marker } = cluster.record;
 const host = "127.0.0.1";
 const record = { resolverRole: { name: resolverRoleName, stage: "planned", oid: null, marker: `go-resolver-test:${runId}` } };
@@ -22,36 +29,15 @@ function roleCatalog(name) {
 let failed = false;
 try {
   await cluster.start();
+  if(httpPrivacy)assertHttpPrivacy(cluster);
   console.log("Verified standalone PostgreSQL 17 bootstrap, JWT compatibility and real SCRAM authentication.");
   if (roleCatalog(resolverRoleName)) throw new Error("Resolver role already exists; refusing collision");
-  // Auth definitions come only from this run's pinned image/bootstrap database.
-  const authSchema = cluster.dumpAuth();
-  sql(database, authSchema, "supabase_admin");
-  sql(database, "create schema extensions; create extension pgcrypto with schema extensions; grant usage on schema extensions,auth to postgres,anon,authenticated,service_role; grant all on all tables in schema auth to postgres; grant all on all sequences in schema auth to postgres;", "supabase_admin");
-  const migrations = readdirSync("supabase/migrations").filter((n) => n.endsWith(".sql")).sort();
-  let resolverBefore;
-  for (const name of migrations) {
-    const accessBoundary = name.endsWith("_event_share_link_resolver_access_boundary.sql");
-    if (accessBoundary) {
-      resolverBefore = sql(database, "select pg_get_functiondef('public.resolve_event_share_link(text)'::regprocedure);");
-      record.resolverRole.stage = "submitted";
-    }
-    sql(database, readFileSync(join("supabase/migrations", name), "utf8"));
-    if (accessBoundary) {
-      // This role was absent before the run and created by its successful migration.
-      const role = roleCatalog(resolverRoleName);
-      record.resolverRole.oid = role.oid;
-      cluster.rawSql("postgres", `comment on role go_event_share_resolver is ${literal(record.resolverRole.marker)};`);
-      record.resolverRole.stage = "confirmed";
-      if (resolverBefore !== sql(database, "select pg_get_functiondef('public.resolve_event_share_link(text)'::regprocedure);")) {
-        throw new Error("Resolver body/attributes changed during access migration");
-      }
-      // Replaying must reject an existing role without altering it or its grants.
-      const replay = sql(database, readFileSync(join("supabase/migrations", name), "utf8"), "postgres", true);
-      if (replay !== null || roleCatalog(resolverRoleName).oid !== role.oid) throw new Error("Role collision did not fail closed");
-      console.log("Resolver definition unchanged; existing role collision safely rejected.");
-    }
-  }
+  const { migrations, applyBoundary } = prepareShareLinkTestDatabase(cluster, {
+    onBoundarySubmitted: () => { record.resolverRole.stage = "submitted"; },
+    onBoundaryCreated: () => { record.resolverRole.oid = roleCatalog(resolverRoleName).oid; record.resolverRole.stage = "confirmed"; },
+  });
+  applyBoundary();
+  console.log("Resolver definition unchanged; existing role collision safely rejected.");
   // Disposable-only SET authority for the trusted migration owner, never an application role.
   sql(database, "grant go_event_share_resolver to postgres with admin true, inherit false, set true;", "supabase_admin");
   sql(database, "create extension pgtap with schema extensions; grant usage on schema extensions to go_event_share_resolver;", "supabase_admin");

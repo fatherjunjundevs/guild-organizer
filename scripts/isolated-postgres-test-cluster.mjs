@@ -8,9 +8,26 @@ import { createServer, createConnection } from "node:net";
 import { homedir } from "node:os";
 import { resolve, join, dirname, relative, isAbsolute, sep } from "node:path";
 import { pathToFileURL } from "node:url";
+import { verifyHttpRecord } from "./postgrest-http-contract.mjs";
 
 export const imageDigest = "public.ecr.aws/supabase/postgres@sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9";
 export const imageId = "sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9";
+// HTTP-only profile: retain the pinned image's required shared libraries, excluding
+// query auditing/explanation hooks. No change to development or SQL-only runs.
+export const httpSharedLibraries = "pg_stat_statements,plpgsql,plpgsql_check,pg_cron,pg_net,pgsodium,pg_tle,plan_filter,supabase_vault";
+export const httpStartupSettings = [
+  `shared_preload_libraries=${httpSharedLibraries}`, "pg_stat_statements.track=none",
+  "logging_collector=off", "log_destination=stderr", "log_connections=off",
+  "log_disconnections=off", "log_checkpoints=off", "log_lock_waits=off",
+  "log_replication_commands=off", "log_autovacuum_min_duration=-1", "log_temp_files=-1",
+];
+export const postgresStartupCommand = [
+  "postgres", "-D", "/etc/postgresql", "-c", "statement_timeout=120s", "-c", "idle_in_transaction_session_timeout=120s",
+  "-c", "log_statement=none", "-c", "log_min_error_statement=panic", "-c", "log_parameter_max_length=0",
+  "-c", "log_parameter_max_length_on_error=0", "-c", "log_min_messages=fatal", "-c", "log_duration=off",
+  "-c", "log_min_duration_statement=-1", "-c", "log_min_duration_sample=-1",
+  "-c", "log_statement_sample_rate=0", "-c", "log_transaction_sample_rate=0",
+];
 export const repositoryRoot = realpathSync(resolve(import.meta.dirname, ".."));
 const repoId = createHash("sha256").update(repositoryRoot).digest("hex");
 const stages = ["planned", "submitted", "created", "starting", "started", "ready", "removing", "removed"];
@@ -18,7 +35,15 @@ const sensitiveLogging = "set log_statement='none'; set log_min_error_statement=
 export const literal = value => "'" + String(value).replaceAll("'", "''") + "'";
 export function safeError(error) {
   // Never return raw Docker/psql stderr: it can echo SQL, credentials or tokens.
-  return error?.safe === true ? error.message : "Isolated test operation failed; sensitive diagnostic details suppressed";
+  if(error?.safe===true)return error.message;
+  const fixed=["HTTP harness transport failed; diagnostics suppressed","HTTP harness assertion failed; sensitive details suppressed",
+    "HTTP harness command deadline exceeded","HTTP harness is unavailable or at its request bound","HTTP command exceeds its bound"];
+  if(fixed.includes(error?.message))return error.message;
+  if(["TypeError","ReferenceError","RangeError"].includes(error?.name)) {
+    const frame=String(error.stack??"").match(/\b(test-share-link-http|isolated-postgrest-test-service|load-share-link-test-modules)\.mjs:(\d+):\d+/);
+    if(frame)return `Isolated ${error.name} at ${frame[1]}.mjs:${frame[2]} (details suppressed)`;
+  }
+  return "Isolated test operation failed; sensitive diagnostic details suppressed";
 }
 function fail(message) { const error = new Error(message); error.safe = true; throw error; }
 function docker(args, input, allowFailure = false, timeout = 180_000) {
@@ -26,7 +51,9 @@ function docker(args, input, allowFailure = false, timeout = 180_000) {
     windowsHide: true });
   if (result.error || result.status !== 0) {
     if (allowFailure) return null;
-    fail(`Isolated Docker ${args[0]} failed (details suppressed)`);
+    const state = typeof result.stderr === "string" ? result.stderr.match(/^(?:ERROR|FATAL):\s+([A-Z0-9]{5}):/m)?.[1] : null;
+    const allowed = ["42501","42601","22023","42883","42703","P0001","58P01"];
+    fail(`Isolated Docker ${args[0]} failed${allowed.includes(state) ? ` (SQLSTATE ${state})` : ""} (details suppressed)`);
   }
   return result.stdout;
 }
@@ -36,8 +63,9 @@ function exactKeys(value, keys) {
 }
 export function verifyManifest(record) {
   if (!exactKeys(record, ["version", "runId", "repoRoot", "repoId", "target", "containerName", "containerId",
-    "intentAt", "createdAt", "phase", "pid", "leasePort", "database", "marker", "identity"])
-    || record.version !== 1 || !/^[a-f0-9]{32}$/.test(record.runId)
+    "intentAt", "createdAt", "phase", "pid", "leasePort", "database", "marker", "identity", ...(Object.hasOwn(record ?? {}, "startupProfile") ? ["startupProfile"] : []), ...(record?.version === 2 ? ["http"] : [])])
+    || (Object.hasOwn(record ?? {}, "startupProfile") && record.startupProfile !== "http-private-v1")
+    || ![1,2].includes(record.version) || !/^[a-f0-9]{32}$/.test(record.runId)
     || record.repoRoot !== repositoryRoot || record.repoId !== repoId
     || record.containerName !== `go-security-pg-${record.runId}`
     || record.database !== `go_share_test_${record.runId}` || record.marker !== `go-disposable:${record.runId}`
@@ -56,6 +84,7 @@ export function verifyManifest(record) {
     fail("Missing exact container creation evidence");
   }
   if (record.phase === "ready" && !record.identity) fail("Missing database identity");
+  if (record.version === 2) verifyHttpRecord(record);
   return record;
 }
 export function verifyTarget(expected, actual) {
@@ -87,9 +116,17 @@ export function verifyContainer(record, container) {
     || Object.values(container.ports ?? {}).some(value => value !== null)) {
     fail("Container ownership/isolation mismatch; operation refused");
   }
+  if (record.startupProfile === "http-private-v1") {
+    const settings = (container.cmd ?? []).filter((_,i,a)=>a[i-1]==="-c");
+    if (!Array.isArray(container.env) || container.env.some(v=>/^PG(OPTIONS|SERVICE|SERVICEFILE|HOSTADDR)=/.test(v))
+      || JSON.stringify(container.cmd)!==JSON.stringify([...postgresStartupCommand,...httpStartupSettings.flatMap(s=>["-c",s])])
+      || httpStartupSettings.some(s=>settings.filter(v=>v===s).length!==1)
+      || settings.filter(v=>v.startsWith("shared_preload_libraries=")).length!==1
+      || settings.some(v=>/^(session|local)_preload_libraries=/.test(v))) fail("HTTP PostgreSQL startup profile mismatch");
+  }
   return container;
 }
-const inspectFormat = '{"id":{{json .Id}},"name":{{json .Name}},"created":{{json .Created}},"image":{{json .Image}},"configImage":{{json .Config.Image}},"labels":{{json .Config.Labels}},"host":{{json .HostConfig}},"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},"state":{{json .State.Status}}}';
+const inspectFormat = '{"id":{{json .Id}},"name":{{json .Name}},"created":{{json .Created}},"image":{{json .Image}},"configImage":{{json .Config.Image}},"labels":{{json .Config.Labels}},"host":{{json .HostConfig}},"mounts":{{json .Mounts}},"ports":{{json .NetworkSettings.Ports}},"state":{{json .State.Status}},"user":{{json .Config.User}},"workingDir":{{json .Config.WorkingDir}},"entrypoint":{{json .Config.Entrypoint}},"cmd":{{json .Config.Cmd}},"openStdin":{{json .Config.OpenStdin}},"tty":{{json .Config.Tty}},"env":{{json .Config.Env}}}';
 function inspect(id) {
   const output = docker(["inspect", "--type", "container", "--format", inspectFormat, id], undefined, true);
   if (output === null) {
@@ -195,8 +232,8 @@ export async function assertInactive(record) {
     socket.once("error", error => { if (error.code === "ECONNREFUSED") resolve(); else reject(new Error("Cannot establish lease inactivity")); });
   });
 }
-class IsolatedCluster {
-  constructor(record, path, liveLease = null) { this.record = record; this.path = path; this.liveLease = liveLease; this.password = null; }
+export class IsolatedCluster {
+  constructor(record, path, liveLease = null) { this.record = record; this.path = path; this.liveLease = liveLease; this.password = null; this.privacySecrets = []; }
   update(changes) { const next = { ...this.record, ...changes }; persistManifest(this.path, next); this.record = next; }
   verify() {
     const disk = readManifest(this.path);
@@ -209,7 +246,7 @@ class IsolatedCluster {
   rawSql(database, input, user = "supabase_admin", allowFailure = false) {
     this.verify();
     if (!["postgres", this.record.database].includes(database) || !["postgres", "supabase_admin"].includes(user)) fail("Unregistered SQL target/authority refused");
-    return docker(["exec", "-i", this.record.containerId, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-U", user, "-d", database], input, allowFailure);
+    return docker(["exec", "-i", this.record.containerId, "psql", "-X", "-qAt", "-v", "ON_ERROR_STOP=1", "-v", "VERBOSITY=verbose", "-U", user, "-d", database], input, allowFailure);
   }
   verifyDatabase() {
     const actual = JSON.parse(this.rawSql("postgres", `select json_build_object('systemId',(pg_control_system()).system_identifier::text,'databaseOid',(select oid::text from pg_database where datname=${literal(this.record.database)}),'owner',(select pg_get_userbyid(datdba) from pg_database where datname=${literal(this.record.database)}),'marker',(select shobj_description(oid,'pg_database') from pg_database where datname=${literal(this.record.database)}));`));
@@ -252,7 +289,9 @@ class IsolatedCluster {
     // Real password login, both denial and acceptance, without CLI/env secrets.
     this.verify();
     const tcp = pass => docker(["exec", "-i", this.record.containerId, "sh", "-c", "IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -X -qAt -w -h 127.0.0.1 -U postgres -d postgres -c 'select current_user'"], pass + "\n", true);
-    if (tcp(randomBytes(32).toString("hex")) !== null || tcp(this.password)?.trim() !== "postgres") fail("Real SCRAM authentication probe failed");
+    const wrongPassword=randomBytes(32).toString("hex");
+    this.privacySecrets.push(this.password,wrongPassword);
+    if (tcp(wrongPassword) !== null || tcp(this.password)?.trim() !== "postgres") fail("Real SCRAM authentication probe failed");
     this.rawSql("postgres", `create database ${this.record.database} template template0 owner postgres; comment on database ${this.record.database} is ${literal(this.record.marker)};`);
     const identity = JSON.parse(this.rawSql("postgres", `select json_build_object('systemId',(pg_control_system()).system_identifier::text,'databaseOid',(select oid::text from pg_database where datname=${literal(this.record.database)}));`));
     this.update({ phase: "ready", identity });
@@ -277,6 +316,12 @@ class IsolatedCluster {
       const disk = readManifest(this.path);
       if (JSON.stringify(disk) !== JSON.stringify(this.record)) fail("Cleanup ownership manifest changed");
       verifyTarget(this.record.target, localTarget());
+      // Version 1 remains unchanged. A registered dependent is removed and its
+      // absence proved before any parent removal; uncertainty never falls through.
+      if (this.record.version === 2) {
+        const { cleanupHttpDependent } = await import("./isolated-postgrest-test-service.mjs");
+        await cleanupHttpDependent(this);
+      }
       if (this.record.phase === "planned") {
         this.update({ phase: "removed" }); // No creation request was submitted.
       } else if (this.record.phase !== "removed") {
@@ -296,13 +341,15 @@ class IsolatedCluster {
       }
       if (this.record.containerId && inspect(this.record.containerId)) fail("Removed container still exists");
       this.password = null;
+      this.privacySecrets = [];
     } finally {
       if (fd !== undefined) { closeSync(fd); unlinkSync(lock); }
       if (this.liveLease) { await new Promise(resolve => this.liveLease.close(resolve)); this.liveLease = null; }
     }
   }
 }
-export async function createIsolatedCluster() {
+export async function createIsolatedCluster({httpPrivacy=false}={}) {
+  if(typeof httpPrivacy!=="boolean") fail("Invalid isolated startup profile");
   const target = localTarget();
   const directory = protectedDirectory();
   const liveLease = await lease();
@@ -310,7 +357,8 @@ export async function createIsolatedCluster() {
   const record = { version: 1, runId, repoRoot: repositoryRoot, repoId, target,
     containerName: `go-security-pg-${runId}`, containerId: null, intentAt: new Date().toISOString(), createdAt: null,
     phase: "planned", pid: process.pid, leasePort: liveLease.address().port,
-    database: `go_share_test_${runId}`, marker: `go-disposable:${runId}`, identity: null };
+    database: `go_share_test_${runId}`, marker: `go-disposable:${runId}`, identity: null,
+    ...(httpPrivacy ? {startupProfile:"http-private-v1"} : {}) };
   const path = join(directory, `${runId}.json`);
   const cluster = new IsolatedCluster(record, path, liveLease);
   try {
@@ -324,9 +372,8 @@ export async function createIsolatedCluster() {
       "--tmpfs", "/var/lib/postgresql/data:rw,noexec,nosuid,nodev,size=1073741824",
       "--env", "PGDATA=/var/lib/postgresql/data", "--env", "POSTGRES_HOST=/var/run/postgresql",
       "--env", "POSTGRES_HOST_AUTH_METHOD=trust", "--env", "POSTGRES_PASSWORD=", imageDigest,
-      "postgres", "-D", "/etc/postgresql", "-c", "statement_timeout=120s", "-c", "idle_in_transaction_session_timeout=120s",
-      "-c", "log_statement=none", "-c", "log_min_error_statement=panic", "-c", "log_parameter_max_length=0",
-      "-c", "log_parameter_max_length_on_error=0"]);
+      ...postgresStartupCommand,
+      ...(httpPrivacy ? httpStartupSettings.flatMap(s=>["-c",s]) : [])]);
     const container = verifyContainer(record, inspect(id.trim()));
     cluster.update({ containerId: container.id, createdAt: container.created, phase: "created" });
     return cluster;
@@ -348,6 +395,9 @@ export async function recoverIsolatedCluster(runId) {
   await cluster.cleanup();
   return record.runId;
 }
+// Internal lifecycle primitives; callers must verify the registered ownership
+// boundary before passing an exact target. Never expose raw command diagnostics.
+export { docker as ownedDocker, inspect as inspectOwnedContainer };
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     if (process.argv.length !== 4 || process.argv[2] !== "recover") fail("Usage: node scripts/isolated-postgres-test-cluster.mjs recover <exact-run-id>");
