@@ -75,8 +75,7 @@ As applicable:
 - [ ] `pnpm build`
 - [ ] `pnpm test:e2e`
 - [ ] `pnpm db:lint`
-- [ ] `pnpm db:test`
-- [ ] `pnpm db:test:concurrency` (owned disposable database; real competing sessions)
+- [ ] `pnpm db:test:concurrency` (all SQL regressions, real competing sessions and production cryptography in an owned disposable database)
 - [ ] `pnpm db:types:check`
 - [ ] `git diff --check`
 - [ ] Browser smoke test
@@ -115,6 +114,8 @@ FUNCTIONAL / QUALITY-GATED COMPLETE
 ```
 
 ## Precise Status Language
+
+GitHub CI uses `pnpm db:test:concurrency` as the single complete SQL regression/concurrency gate. It discovers every `supabase/tests/*.test.sql` file (currently 33 files and 1,401 assertions), then requires 16 concurrency, 130 authorization-concurrency and 31 production-cryptographic assertions plus verified cleanup. CI explicitly provisions the runner's existing digest-pinned PostgreSQL image and private Linux manifest destination; the runner still rejects missing/mismatched images or unsupported Docker targets. The separate Supabase CLI migration reset, schema lint and generated-type check remain required. `pnpm db:test` is the legacy CLI path and lacks the disposable-only resolver SET/session-authorization authority; it is not a substitute for this gate. No migration or application-role privileges are changed to accommodate CI.
 
 Phase 6.3A.5C.1C adds separate local `db:test:http` and `db:test:http:isolation` gates. They require reviewed immutable PostgREST binary/image provenance and real independently owned Docker runs, including exact-resource cleanup. Unknown provenance or an unavailable daemon is BLOCKED, never a runtime pass. Keep the existing 1,401 SQL, 16 lifecycle-concurrency, 130 authorization-concurrency and 31 production-cryptographic integration baselines; previous results do not substitute for rerunning changed infrastructure. HTTP 42501/status/header evidence, actual pool logging/identity controls and cache transitions must pass before local HTTP approval. Hosted gateway/browser validation and CI changes require their separate approvals. See [the checkpoint report](reviews/PHASE_6_3A_5C_1C_VALIDATION.md).
 

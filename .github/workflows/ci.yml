@@ -102,10 +102,14 @@ jobs:
       - name: Lint database schema
         run: pnpm db:lint
 
-      - name: Database tests
-        run: pnpm db:test
+      - name: Prepare the pinned isolated PostgreSQL runner
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.local/state"
+          image="$(node --input-type=module -e 'import { imageDigest } from "./scripts/isolated-postgres-test-cluster.mjs"; process.stdout.write(imageDigest)')"
+          docker pull "$image"
 
-      - name: Share-link concurrency tests in an owned disposable database
+      - name: Complete SQL regressions, concurrency and cryptography in an owned disposable database
         run: pnpm db:test:concurrency
 
       - name: Verify generated database types

@@ -1344,3 +1344,66 @@ Final Git status follows; branch/HEAD/index remain as above. No stage, commit, p
 ```
 
 **STOP for independent ChatGPT source review. No commit or deployment is authorized.**
+
+
+## 2026-10-11 ? CI SQL runner restoration (uncommitted review proposal)
+
+### Baseline and confirmed failure
+
+Branch: feature/phase-6-publishing-sharing. HEAD: 4305c7748021cd6d9d0c009aacf372d771585af5. Initial working tree and index were clean. No Work Package B implementation is included.
+
+GitHub Actions [run 38159235131](https://github.com/fatherjunjundevs/guild-organizer/actions/runs/38159235131) completed with quality SUCCESS and database FAILURE. Database migration reset and schema lint succeeded; Database tests failed; the owned runner and generated-type check were skipped. The three reported permission failures are in event_share_link_management_state.test.sql, event_share_link_resolver_access.test.sql and event_share_links.test.sql.
+
+The workflow invoked the standard Supabase CLI SQL path before the existing owned runner. Its postgres session is intentionally not a superuser. The access-boundary migration creates a restricted NOLOGIN resolver with no application membership; the trusted creator ADMIN grant does not enable SET. Two tests need test-only SET authority, while the access test needs a genuinely restricted session_user through SET SESSION AUTHORIZATION. Granting SET alone cannot satisfy the latter from a non-superuser login. PostgreSQL documents this distinction in [SET ROLE](https://www.postgresql.org/docs/17/sql-set-role.html) and [SET SESSION AUTHORIZATION](https://www.postgresql.org/docs/17/sql-set-session-authorization.html).
+
+The existing independent runner already supplies the appropriate disposable-only postgres SET grant with INHERIT false, pgTAP schema access, and a supabase_admin connection for the access/session-authorization test. Production migration, resolver attributes, application privileges, SQLSTATE 42501 expectations and SQL test files remain unchanged.
+
+### Exact source scope
+
+- .github/workflows/ci.yml: replace the CLI Database tests step with Bash preparation of the private Linux manifest base and an explicit pull of the existing immutable imageDigest exported by the runner. Rename the existing concurrency step to identify its complete SQL/concurrency/cryptographic coverage. It still executes pnpm db:test:concurrency once.
+- docs/QUALITY_GATES.md: identify that owned runner as the authoritative complete SQL gate and explain the legacy CLI authority limitation.
+- This report: append this verified evidence; earlier report bytes are preserved.
+
+No package/dependency, runner, bootstrap, public migration, RLS, application role, SQL expectation, fixture, authentication, preload or HTTP privacy implementation was changed. The quality job, workflow triggers, Supabase start/reset/schema lint, generated-type check and always-run Supabase stop steps are structurally unchanged.
+
+### Linux provisioning and fail-closed behavior
+
+The runner already accepts a local Linux unix:///var/run/docker.sock, enforces a Linux daemon, and uses private owned POSIX manifest directories. A fresh GitHub-hosted home need not contain ~/.local/state, so CI prepares that base with install -d -m 700. Docker pulls only public.ecr.aws/supabase/postgres@sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9, obtained from the existing export instead of a second pin. No image pull/build was performed locally.
+
+Explicit Bash uses GitHub's fail-on-error/pipefail behavior; preparation and pull failures fail the job. The existing runner independently requires the approved image ID and RepoDigest, supported local endpoint, immutable daemon identity, exact intent/ID/labels/timestamps, network none, no published ports/binds/persistent volumes, bounded tmpfs and resources, and database system identifier/OID/ownership marker. It never discovers or connects to the CLI stack or development/production database. Random credentials remain in the established protected in-memory/stdin flow; no GitHub secrets or credential permissions were added.
+
+Every discovered regression file must return a complete matching TAP plan without not-ok results; SQL execution failure is fatal. Concurrency counts 16/130 and crypto count 31 remain mandatory. Cleanup uncertainty sets a nonzero process exit, retaining ownership evidence rather than force-cleaning uncertain resources. The workflow does not suppress those exits or type-check failure. Discovery exercised all current 33 files once, including the three permission regressions; no SQL coverage was deleted or duplicated.
+
+### Fresh local validation
+
+| Check | Result |
+| --- | --- |
+| pnpm exec tsc --noEmit | PASS, exit 0 |
+| pnpm lint | PASS, exit 0 |
+| pnpm test | PASS, 677 tests in 45 files, exit 0 |
+| Workflow YAML parse and structural gate assertions | PASS; quality job/triggers and compatibility/lint/type/stop steps preserved; complete SQL gate exactly once; no continue-on-error |
+| CI preparation Bash syntax and actual Node digest extraction | PASS; preparation/pull commands were not executed locally |
+| node scripts/test-share-link-concurrency.mjs | PASS, 1,401 assertions across all 33 SQL files; 16 concurrency; 130 authorization-concurrency; 31 production crypto, exit 0 |
+| CRLF-aware git diff whitespace check | PASS, exit 0; blank-at-eol, blank-at-eof, space-before-tab and cr-at-eol enabled |
+
+The three formerly failing SQL files passed 101, 27 and 311 assertions respectively. All 39 migrations replayed inside the owned empty database. The transcript's 33 per-file names and assertion totals were cross-checked against the complete current supabase/tests discovery.
+
+The standard whitespace check flags CR bytes on edited lines of the previously approved CRLF documentation. The full CRLF-aware check recognizes those existing line endings while retaining trailing-whitespace/blank-EOF/space-before-tab checks. No repository/global configuration or wholesale line-ending normalization was performed.
+
+### Exact cleanup and development preservation
+
+One default SQL-profile cluster was created; no HTTP sidecar or HTTP suite was run.
+
+- Run ID: 1592da09b3282cedeef86fe64e2a7af3.
+- Full container ID: 51602d065c8fe2d5a49d0fa913cfb004fc4637c7aa121256b3949c002413b8ef.
+- The ownership manifest is valid and phase removed; successful full-ID inventory proves that container absent. All 56 protected manifests have removed parent/dependent phases, and the labeled test-container inventory is empty.
+- Before/after snapshots match all 12 development container identities/configuration/network fingerprints, all four networks, all three volumes and all 15 image inventory entries. No development SQL connection, reset, migration or container lifecycle operation occurred.
+- Safe local evidence is retained at C:/Users/Miguel/AppData/Local/Temp/go-ci-sql-runner-ce379bfff4e74f3abb202f65664b7670 (baseline/final snapshots, sanitized SQL transcript, exit code and verified result metadata). Runtime secrets and database contents are excluded from the review ZIP.
+
+The earlier historical Docker network discrepancy remains Classification C, unexplained. Matching current snapshots do not reclassify that historical observation as harmless.
+
+### Limits and review state
+
+This validates the current owned runner on the local Windows control plane with Docker's Linux engine; Bash/YAML and Linux path preparation were checked without executing the updated workflow on Ubuntu. A new GitHub Actions result is pending independent review and a separately authorized commit/push. The original run's quality PASS and reset/lint PASS are historical CI evidence, not a green result for this uncommitted workflow. Generated types were not checked against the development database locally; the unchanged CI type gate remains required. No HTTP/lifecycle suite was rerun because neither runner nor its isolation implementation changed.
+
+Final source scope is exactly the three modified tracked paths listed above. The index remains empty; no untracked repository artifacts, staging, commit, push, deployment or Work Package B work occurred. The review ZIP includes these three source files, an exact unified diff and a SHA-256 manifest; its checksum is provided separately in Downloads.
